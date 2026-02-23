@@ -1,0 +1,524 @@
+<svg viewBox="-100 0 800 370" preserveAspectRatio="xMinYMin meet" style="overflow:visible" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="SOTA UQ metrics pipeline showing entropy and Dice-based uncertainty quantification">
+  <title id="metricTitle">SOTA UQ Metrics Pipeline</title>
+  <desc id="metricDesc">Complete pipeline: Deep learning model generates n predictions, averaged to compute per-pixel probabilities p(x). Two uncertainty branches: (1) Entropy H(x) computed pixel-wise from p(x), highlighting boundary uncertainty. (2) Dice-based uncertainty computed by measuring overlap between each prediction and the mean mask, summarized as mean or std across predictions. Higher entropy or lower Dice indicate regions of low model consensus.</desc>
+  
+  <style>
+    .blend-circle {
+      mix-blend-mode: screen;
+    }
+  </style>
+  
+  <defs>
+    <!-- Arrow marker (smaller for thinner connectors) -->
+    <marker id="arrowhead" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+      <polygon points="0 0, 6 3, 0 6" fill="#4a8ec2"/>
+    </marker>
+    
+    <!-- Symbols for repeated accumulators -->
+    <symbol id="avgAccumSymbol" viewBox="0 0 20 20" overflow="visible">
+      <circle cx="10" cy="10" r="6" fill="#0066CC" opacity="0"/>
+    </symbol>
+    <symbol id="avgBlendSymbol" viewBox="0 0 20 20" overflow="visible">
+      <circle cx="10" cy="10" r="6" fill="#0066CC" opacity="0.2"/>
+    </symbol>
+    
+    <!-- Smooth average probability gradient (soft edges for realistic p(x)) -->
+    <radialGradient id="avgProbGrad" cx="0.5" cy="0.45" r="0.7" fx="0.5" fy="0.45">
+      <stop offset="0%" stop-color="white" stop-opacity="1"/>
+      <stop offset="70%" stop-color="white" stop-opacity="1"/>
+      <stop offset="85%" stop-color="white" stop-opacity="0.25"/>
+      <stop offset="100%" stop-color="white" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Edge-focused gradient: transparent center, stronger at edges -->
+    <radialGradient id="avgProbEdgeGrad" cx="0.5" cy="0.5" r="0.75" fx="0.5" fy="0.5">
+      <stop offset="0%" stop-color="white" stop-opacity="0"/>
+      <stop offset="60%" stop-color="white" stop-opacity="0.35"/>
+      <stop offset="85%" stop-color="white" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="white" stop-opacity="0.4"/>
+    </radialGradient>
+
+    <!-- Reusable cluster of averaged circles for overlap calculations (changed to blue for visibility) -->
+    <g id="avgOverlapCirclesShape">
+      <!-- Changed from white to blue for visibility on white background -->
+      <circle class="blend-circle" cx="54" cy="36" r="6" fill="#0066CC" opacity="0.25"/>
+      <circle class="blend-circle" cx="53" cy="38" r="6.5" fill="#0066CC" opacity="0.25"/>
+      <circle class="blend-circle" cx="50" cy="33" r="7.5" fill="#0066CC" opacity="0.25"/>
+      <circle class="blend-circle" cx="55" cy="37" r="8" fill="#0066CC" opacity="0.25"/>
+      <circle class="blend-circle" cx="54" cy="32" r="6" fill="#0066CC" opacity="0.25"/>
+      <circle class="blend-circle" cx="55" cy="36" r="7" fill="#0066CC" opacity="0.25"/>
+      <circle class="blend-circle" cx="53" cy="35" r="8" fill="#0066CC" opacity="0.25"/>
+      <circle class="blend-circle" cx="54" cy="36.5" r="9" fill="#0066CC" opacity="0.25"/>
+    </g>
+
+    <!-- Threshold mask that keeps only regions where >=50% (~4/7) of the circles overlap -->
+    <filter id="overlap50Threshold" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB">
+      <!-- table mapping sampled alpha -> {0,1} with threshold just above 0.5; 11 steps gives 0.0..1.0 in 0.1 increments -->
+      <feComponentTransfer in="SourceAlpha">
+        <!-- inputs 0..0.5 map to 0, inputs >0.5 map to 1 -->
+        <feFuncA type="table" tableValues="0 0 0 0 0 0 1 1 1 1 1"/>
+      </feComponentTransfer>
+    </filter>
+
+    <mask id="overlap50Mask" maskUnits="userSpaceOnUse" maskContentUnits="userSpaceOnUse" x="0" y="0" width="850" height="420">
+      <g filter="url(#overlap50Threshold)">
+        <use href="#avgOverlapCirclesShape"/>
+      </g>
+    </mask>
+
+    <!-- Panel-specific masks so mask content aligns with transformed tiles -->
+    <mask id="overlap50Mask_avg" maskUnits="userSpaceOnUse" maskContentUnits="userSpaceOnUse" x="0" y="0" width="850" height="420">
+      <g transform="translate(360,120) scale(1.15)">
+        <g filter="url(#overlap50Threshold)">
+          <use href="#avgOverlapCirclesShape"/>
+        </g>
+      </g>
+    </mask>
+
+    <mask id="overlap50Mask_entropy" maskUnits="userSpaceOnUse" maskContentUnits="userSpaceOnUse" x="0" y="0" width="850" height="420">
+      <g transform="translate(515,78) scale(1.15)">
+        <g filter="url(#overlap50Threshold)">
+          <use href="#avgOverlapCirclesShape"/>
+        </g>
+      </g>
+    </mask>
+
+    <mask id="overlap50Mask_dice" maskUnits="userSpaceOnUse" maskContentUnits="userSpaceOnUse" x="0" y="0" width="850" height="420">
+      <g transform="translate(515,213) scale(1.15)">
+        <g filter="url(#overlap50Threshold)">
+          <use href="#avgOverlapCirclesShape"/>
+        </g>
+      </g>
+    </mask>
+
+    <!-- Reusable highlight for >=50% overlap (neutral definitions - mask applied at use sites) -->
+    <g id="overlap50Highlight">
+      <circle cx="54" cy="36" r="6" fill="#e6f7ff" opacity="0.8"/>
+    </g>
+    <g id="overlap50Downlight">
+      <circle cx="54" cy="36" r="6" fill="#0a0a0a" opacity="0.8"/>
+    </g>
+
+    <!-- Inverse mask: keeps regions outside the >=50% overlap (disagreement band) -->
+    <filter id="overlap50InverseThreshold" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB">
+      <!-- inverse table of overlap50Threshold: inputs <=0.5 -> 1 (keep), inputs >0.5 -> 0 (discard) -->
+      <feComponentTransfer in="SourceAlpha">
+        <feFuncA type="table" tableValues="1 1 1 1 1 1 0 0 0 0 0"/>
+      </feComponentTransfer>
+    </filter>
+
+    <mask id="overlap50InverseMask" maskUnits="userSpaceOnUse" maskContentUnits="userSpaceOnUse" x="0" y="0" width="850" height="420">
+      <g filter="url(#overlap50InverseThreshold)">
+        <use href="#avgOverlapCirclesShape"/>
+      </g>
+    </mask>
+
+    <!-- Panel-specific inverse masks so inverse mask content aligns with transformed tiles -->
+    <mask id="overlap50InverseMask_avg" maskUnits="userSpaceOnUse" maskContentUnits="userSpaceOnUse" x="0" y="0" width="850" height="420">
+      <g transform="translate(360,120) scale(1.15)">
+        <g filter="url(#overlap50InverseThreshold)">
+          <use href="#avgOverlapCirclesShape"/>
+        </g>
+      </g>
+    </mask>
+
+    <mask id="overlap50InverseMask_entropy" maskUnits="userSpaceOnUse" maskContentUnits="userSpaceOnUse" x="0" y="0" width="850" height="420">
+      <g transform="translate(515,78) scale(1.15)">
+        <g filter="url(#overlap50InverseThreshold)">
+          <use href="#avgOverlapCirclesShape"/>
+        </g>
+      </g>
+    </mask>
+
+    <mask id="overlap50InverseMask_dice" maskUnits="userSpaceOnUse" maskContentUnits="userSpaceOnUse" x="0" y="0" width="850" height="420">
+      <g transform="translate(515,213) scale(1.15)">
+        <g filter="url(#overlap50InverseThreshold)">
+          <use href="#avgOverlapCirclesShape"/>
+        </g>
+      </g>
+    </mask>
+
+    <!-- Reusable outline for low-overlap border (neutral definition - mask applied at use sites) -->
+    <g id="overlap50InverseOutline">
+      <circle cx="54" cy="36" r="6" fill="none" stroke="#e6f7ff" stroke-width="1.4" opacity="0.8" style="mix-blend-mode: screen;"/>
+      <circle cx="54" cy="36" r="9" fill="none" stroke="#e6f7ff" stroke-width="0.8" opacity="0.5" style="mix-blend-mode: screen;"/>
+    </g>
+
+    <!-- Entropy halo: compute 4*p*(1-p) from the average alpha (peaks at p=0.5), blur and color -->
+    <filter id="entropyHalo" x="-60%" y="-60%" width="220%" height="220%" color-interpolation-filters="sRGB">
+      <!-- sample SourceAlpha and remap with a table approximating 4*p*(1-p) -->
+      <feComponentTransfer in="SourceAlpha" result="p">
+        <feFuncA type="table" tableValues="0 0.36 0.64 0.84 0.96 1 0.96 0.84 0.64 0.36 0"/>
+      </feComponentTransfer>
+      <!-- soften the edge to create a smooth halo -->
+      <feGaussianBlur in="p" stdDeviation="3" result="blurred"/>
+      <!-- color the halo and keep only the colored halo as the filter result -->
+      <feFlood flood-color="#ffa500" result="gold"/>
+      <feComposite in="gold" in2="blurred" operator="in" result="haloColor"/>
+      <feMerge>
+        <feMergeNode in="haloColor"/>
+      </feMerge>
+    </filter>
+
+    <!-- Entropy ring: blur the stroke to follow the average-pred boundary -->
+    <filter id="entropyRing" x="-80%" y="-80%" width="260%" height="260%" color-interpolation-filters="sRGB">
+      <!-- blur the stroke alpha -->
+      <feGaussianBlur in="SourceAlpha" stdDeviation="3" result="g"/>
+      <feFlood flood-color="#ffa500" result="gold"/>
+      <feComposite in="gold" in2="g" operator="in" result="haloColor"/>
+      <feMerge>
+        <feMergeNode in="haloColor"/>
+      </feMerge>
+    </filter>
+
+    <!-- CT Scan template function -->
+    <g id="ctTemplate">
+      <rect width="80" height="80" rx="3" fill="#0a0a0a"/>
+      <!-- Body outline (coronal slice - anterior to posterior view) -->
+      <ellipse cx="40" cy="40" rx="32" ry="26" fill="#1a1a1a" stroke="#2a2a2a" stroke-width="1"/>
+
+      <!-- Spine (coronal view - single vertebra visible at center depth, lower) -->
+      <g id="spine" opacity="0.6">
+        <path d="M36 52 L44 51.5 L45 61 L36.5 61.5 Z" fill="#3a3a3a" stroke="#404040" stroke-width="0.3"/>
+      </g>
+
+      <!-- Right lung (thick posteriorly, taper anteriorly - larger) -->
+      <path d="M44 18 C65 20 70 50 62 58 C54 62 46 60 44 52 C42 38 42 26 44 18 Z" fill="#050505" stroke="#151515" stroke-width="0.5"/>
+      
+      <!-- Left lung with pronounced cardiac notch (thick posteriorly, larger) -->
+      <path d="M36 18 C15 20 10 50 18 58 C26 62 34 60 36 52 C38 44 38 34 36 26 C36 22 36 18 36 18 Z" fill="#050505" stroke="#151515" stroke-width="0.5"/>
+      
+      <!-- Cardiac notch - concave indentation on medial surface of left lung (larger) -->
+      <path d="M36 32 Q28 40 31 46 Q35 40 36 32 Z" fill="#0a0a0a" stroke="none" opacity="0.7"/>
+
+      <!-- Heart (more anterior, larger, higher, rightward) -->
+      <g transform="translate(32,32)">
+        <ellipse cx="4" cy="4" rx="7" ry="9" fill="#353535" stroke="#404040" stroke-width="0.4"/>
+        <path d="M -1 2 Q 4 -3 9 2 Q 6 9 4 12 Q 2 9 -1 2 Z" fill="#2f2f2f" opacity="0.95"/>
+      </g>
+    </g>
+  </defs>
+
+  
+
+  <!-- CT Input (kept left but visible within expanded viewBox) -->
+  <g transform="translate(-80, 150)">
+    <use href="#ctTemplate" transform="scale(0.9)"/>
+    <text x="32" y="95" text-anchor="middle" fill="#222222" font-size="10">CT Input</text>
+  </g>
+
+  <!-- Deep Learning Model -->
+  <g id="model" data-node-id="dl-model">
+    
+    <!-- Neural network layers -->
+    <g transform="translate(35, 140)">
+      <!-- Input layer -->
+      <circle cx="10" cy="15" r="4" fill="#90caf9"/>
+      <circle cx="10" cy="30" r="4" fill="#90caf9"/>
+      <circle cx="10" cy="45" r="4" fill="#90caf9"/>
+      <circle cx="10" cy="60" r="4" fill="#90caf9"/>
+      
+      <!-- Hidden layer 1 -->
+      <circle cx="40" cy="10" r="4" fill="#64b5f6"/>
+      <circle cx="40" cy="25" r="4" fill="#64b5f6"/>
+      <circle cx="40" cy="40" r="4" fill="#64b5f6"/>
+      <circle cx="40" cy="55" r="4" fill="#64b5f6"/>
+      <circle cx="40" cy="70" r="4" fill="#64b5f6"/>
+      
+      <!-- Hidden layer 2 -->
+      <circle cx="70" cy="15" r="4" fill="#42a5f5"/>
+      <circle cx="70" cy="30" r="4" fill="#42a5f5"/>
+      <circle cx="70" cy="45" r="4" fill="#42a5f5"/>
+      <circle cx="70" cy="60" r="4" fill="#42a5f5"/>
+      
+      <!-- Output layer -->
+      <circle cx="95" cy="25" r="4" fill="#81c784"/>
+      <circle cx="95" cy="45" r="4" fill="#81c784"/>
+      
+      <!-- Connections: Input to Hidden Layer 1 (4×5=20) -->
+      <line class="nn-connection layer-1" x1="10" y1="15" x2="40" y2="10" stroke="#64b5f6" stroke-width="0.8" opacity="0.3"/>
+      <line class="nn-connection layer-1" x1="10" y1="15" x2="40" y2="25" stroke="#64b5f6" stroke-width="1.2" opacity="0.3"/>
+      <line class="nn-connection layer-1" x1="10" y1="15" x2="40" y2="40" stroke="#64b5f6" stroke-width="0.6" opacity="0.3"/>
+      <line class="nn-connection layer-1" x1="10" y1="15" x2="40" y2="55" stroke="#64b5f6" stroke-width="1.0" opacity="0.3"/>
+      <line class="nn-connection layer-1" x1="10" y1="15" x2="40" y2="70" stroke="#64b5f6" stroke-width="0.7" opacity="0.3"/>
+      
+      <line class="nn-connection layer-1" x1="10" y1="30" x2="40" y2="10" stroke="#64b5f6" stroke-width="0.9" opacity="0.3"/>
+      <line class="nn-connection layer-1" x1="10" y1="30" x2="40" y2="25" stroke="#64b5f6" stroke-width="0.7" opacity="0.3"/>
+      <line class="nn-connection layer-1" x1="10" y1="30" x2="40" y2="40" stroke="#64b5f6" stroke-width="1.2" opacity="0.3"/>
+      <line class="nn-connection layer-1" x1="10" y1="30" x2="40" y2="55" stroke="#64b5f6" stroke-width="0.8" opacity="0.3"/>
+      <line class="nn-connection layer-1" x1="10" y1="30" x2="40" y2="70" stroke="#64b5f6" stroke-width="1.1" opacity="0.3"/>
+      
+      <line class="nn-connection layer-1" x1="10" y1="45" x2="40" y2="10" stroke="#64b5f6" stroke-width="1.0" opacity="0.3"/>
+      <line class="nn-connection layer-1" x1="10" y1="45" x2="40" y2="25" stroke="#64b5f6" stroke-width="0.6" opacity="0.3"/>
+      <line class="nn-connection layer-1" x1="10" y1="45" x2="40" y2="40" stroke="#64b5f6" stroke-width="0.9" opacity="0.3"/>
+      <line class="nn-connection layer-1" x1="10" y1="45" x2="40" y2="55" stroke="#64b5f6" stroke-width="1.2" opacity="0.3"/>
+      <line class="nn-connection layer-1" x1="10" y1="45" x2="40" y2="70" stroke="#64b5f6" stroke-width="0.8" opacity="0.3"/>
+      
+      <line class="nn-connection layer-1" x1="10" y1="60" x2="40" y2="10" stroke="#64b5f6" stroke-width="0.7" opacity="0.3"/>
+      <line class="nn-connection layer-1" x1="10" y1="60" x2="40" y2="25" stroke="#64b5f6" stroke-width="1.1" opacity="0.3"/>
+      <line class="nn-connection layer-1" x1="10" y1="60" x2="40" y2="40" stroke="#64b5f6" stroke-width="0.8" opacity="0.3"/>
+      <line class="nn-connection layer-1" x1="10" y1="60" x2="40" y2="55" stroke="#64b5f6" stroke-width="0.9" opacity="0.3"/>
+      <line class="nn-connection layer-1" x1="10" y1="60" x2="40" y2="70" stroke="#64b5f6" stroke-width="1.0" opacity="0.3"/>
+      
+      <!-- Connections: Hidden Layer 1 to Hidden Layer 2 (5×4=20) -->
+      <line class="nn-connection layer-2" x1="40" y1="10" x2="70" y2="15" stroke="#42a5f5" stroke-width="1.1" opacity="0.3"/>
+      <line class="nn-connection layer-2" x1="40" y1="10" x2="70" y2="30" stroke="#42a5f5" stroke-width="0.7" opacity="0.3"/>
+      <line class="nn-connection layer-2" x1="40" y1="10" x2="70" y2="45" stroke="#42a5f5" stroke-width="0.9" opacity="0.3"/>
+      <line class="nn-connection layer-2" x1="40" y1="10" x2="70" y2="60" stroke="#42a5f5" stroke-width="0.6" opacity="0.3"/>
+      
+      <line class="nn-connection layer-2" x1="40" y1="25" x2="70" y2="15" stroke="#42a5f5" stroke-width="0.8" opacity="0.3"/>
+      <line class="nn-connection layer-2" x1="40" y1="25" x2="70" y2="30" stroke="#42a5f5" stroke-width="1.2" opacity="0.3"/>
+      <line class="nn-connection layer-2" x1="40" y1="25" x2="70" y2="45" stroke="#42a5f5" stroke-width="0.7" opacity="0.3"/>
+      <line class="nn-connection layer-2" x1="40" y1="25" x2="70" y2="60" stroke="#42a5f5" stroke-width="1.0" opacity="0.3"/>
+      
+      <line class="nn-connection layer-2" x1="40" y1="40" x2="70" y2="15" stroke="#42a5f5" stroke-width="0.9" opacity="0.3"/>
+      <line class="nn-connection layer-2" x1="40" y1="40" x2="70" y2="30" stroke="#42a5f5" stroke-width="0.6" opacity="0.3"/>
+      <line class="nn-connection layer-2" x1="40" y1="40" x2="70" y2="45" stroke="#42a5f5" stroke-width="1.2" opacity="0.3"/>
+      <line class="nn-connection layer-2" x1="40" y1="40" x2="70" y2="60" stroke="#42a5f5" stroke-width="0.8" opacity="0.3"/>
+      
+      <line class="nn-connection layer-2" x1="40" y1="55" x2="70" y2="15" stroke="#42a5f5" stroke-width="0.7" opacity="0.3"/>
+      <line class="nn-connection layer-2" x1="40" y1="55" x2="70" y2="30" stroke="#42a5f5" stroke-width="1.0" opacity="0.3"/>
+      <line class="nn-connection layer-2" x1="40" y1="55" x2="70" y2="45" stroke="#42a5f5" stroke-width="1.1" opacity="0.3"/>
+      <line class="nn-connection layer-2" x1="40" y1="55" x2="70" y2="60" stroke="#42a5f5" stroke-width="0.9" opacity="0.3"/>
+      
+      <line class="nn-connection layer-2" x1="40" y1="70" x2="70" y2="15" stroke="#42a5f5" stroke-width="1.0" opacity="0.3"/>
+      <line class="nn-connection layer-2" x1="40" y1="70" x2="70" y2="30" stroke="#42a5f5" stroke-width="0.8" opacity="0.3"/>
+      <line class="nn-connection layer-2" x1="40" y1="70" x2="70" y2="45" stroke="#42a5f5" stroke-width="0.6" opacity="0.3"/>
+      <line class="nn-connection layer-2" x1="40" y1="70" x2="70" y2="60" stroke="#42a5f5" stroke-width="1.1" opacity="0.3"/>
+      
+      <!-- Connections: Hidden Layer 2 to Output (4×2=8) -->
+      <line class="nn-connection layer-3" x1="70" y1="15" x2="95" y2="25" stroke="#81c784" stroke-width="1.2" opacity="0.3"/>
+      <line class="nn-connection layer-3" x1="70" y1="15" x2="95" y2="45" stroke="#81c784" stroke-width="0.8" opacity="0.3"/>
+      
+      <line class="nn-connection layer-3" x1="70" y1="30" x2="95" y2="25" stroke="#81c784" stroke-width="0.9" opacity="0.3"/>
+      <line class="nn-connection layer-3" x1="70" y1="30" x2="95" y2="45" stroke="#81c784" stroke-width="1.1" opacity="0.3"/>
+      
+      <line class="nn-connection layer-3" x1="70" y1="45" x2="95" y2="25" stroke="#81c784" stroke-width="0.7" opacity="0.3"/>
+      <line class="nn-connection layer-3" x1="70" y1="45" x2="95" y2="45" stroke="#81c784" stroke-width="1.2" opacity="0.3"/>
+      
+      <line class="nn-connection layer-3" x1="70" y1="60" x2="95" y2="25" stroke="#81c784" stroke-width="1.0" opacity="0.3"/>
+      <line class="nn-connection layer-3" x1="70" y1="60" x2="95" y2="45" stroke="#81c784" stroke-width="0.6" opacity="0.3"/>
+    </g>
+    
+      <g transform="translate(80,225)" aria-hidden="true">
+      <text x="0" y="4" text-anchor="middle" fill="#222222" font-size="11">Segmentation</text>
+    </g>
+  </g>
+  
+  <!-- Prediction stack (persistent) -->
+  <g id="predictionStack" data-node-id="pred-stack">
+    <g opacity="0.3" transform="translate(180, 100) scale(1.15)">
+      <use href="#ctTemplate"/>
+      <circle cx="54" cy="36" r="6" fill="white" opacity="0.9"/>
+    </g>
+    <g opacity="0.4" transform="translate(187, 107) scale(1.15)">
+      <use href="#ctTemplate"/>
+      <circle cx="56" cy="38" r="6.5" fill="white" opacity="0.9"/>
+    </g>
+    <g opacity="0.5" transform="translate(194, 114) scale(1.15)">
+      <use href="#ctTemplate"/>
+      <circle cx="52" cy="35" r="5.5" fill="white" opacity="0.9"/>
+    </g>
+    <g opacity="0.7" transform="translate(201, 121) scale(1.15)">
+      <use href="#ctTemplate"/>
+      <circle cx="55" cy="37" r="7" fill="white" opacity="0.9"/>
+    </g>
+    <g transform="translate(208, 128) scale(1.15)">
+      <use href="#ctTemplate"/>
+      <circle cx="53" cy="36" r="6" fill="white" opacity="0.95"/>
+    </g>
+    
+    <g transform="translate(258,235)" aria-hidden="true">
+      <text x="0" y="4" text-anchor="middle" fill="#222222" font-size="11">Ensemble</text>
+    </g>
+  </g>
+  
+  <!-- Predictions flowing from model -->
+  <g id="flowingPredictions">
+    <g class="prediction" opacity="1">
+      <g class="pred-base" transform="translate(170, 155)">
+        <use href="#ctTemplate" transform="scale(0.8)"/>
+        <circle class="pred-tumor" cx="32" cy="25" r="4" fill="white" opacity="0.95"/>
+      </g>
+    </g>
+  </g>
+  
+  <!-- Arrow label: model to predictions -->
+  <text x="155" y="175" text-anchor="middle" fill="#222222" font-size="9">T runs</text>
+  
+  <!-- Average prediction -->
+  <g id="avgPrediction" data-node-id="avg-pred">
+    <g transform="translate(360, 120) scale(1.15)">
+      <use href="#ctTemplate"/>
+      
+      <!-- Final averaged result with blue circles showing ensemble -->
+      <use href="#avgOverlapCirclesShape"/> 
+
+      
+    </g>
+    
+    <g transform="translate(415,235)" aria-hidden="true">
+      <text x="0" y="4" text-anchor="middle" fill="#222222" font-size="11">Average p(x)</text>
+    </g>
+  </g>
+  
+  <!-- Arrow label: predictions to average -->
+  <text x="325" y="175" text-anchor="middle" fill="#222222" font-size="9">aggregate</text>
+  
+  <!-- Entropy branch -->
+  <g id="entropyBranch" data-node-id="entropy-branch" role="group" aria-label="Entropy computation branch">
+    
+    <!-- Entropy visualization showing border of average prediction -->
+    <g class="entropy-viz" transform="translate(515, 78) scale(1.15)">
+      <use href="#ctTemplate"/>
+ 
+
+
+      <!-- Edge-based uncertainty halo: irregular stroked outline blurred to follow blob boundary (smaller, aligned) -->
+      <path d="M54 27 C 68 28 66 34 66 40 C 66 46 60 50 54 48 C 48 46 44 42 44 36 C 44 30 48 26 54 27 Z" transform="translate(54,36) scale(0.65) translate(-54,-36)" fill="none" stroke="#ffa500" stroke-width="2" stroke-linejoin="round" opacity="0.4" filter="url(#entropyRing)"/>
+      <path d="M54 27 C 68 28 66 34 66 40 C 66 46 60 50 54 48 C 48 46 44 42 44 36 C 44 30 48 26 54 27 Z" transform="translate(54,36) scale(0.65) translate(-54,-36)" fill="none" stroke="#ffa500" stroke-width="4" stroke-linejoin="round" opacity="0.1"/>
+      <path d="M54 27 C 68 28 66 34 66 40 C 66 46 60 50 54 48 C 48 46 44 42 44 36 C 44 30 48 26 54 27 Z" transform="translate(54,36) scale(0.7) translate(-54,-36)" fill="none" stroke="#ffa500" stroke-width="4" stroke-linejoin="round" opacity="0.1"/>
+      <path d="M54 27 C 68 28 66 34 66 40 C 66 46 60 50 54 48 C 48 46 44 42 44 36 C 44 30 48 26 54 27 Z" transform="translate(54,36) scale(0.75) translate(-54,-36)" fill="none" stroke="#ffa500" stroke-width="4" stroke-linejoin="round" opacity="0.1"/>
+      <path d="M54 27 C 68 28 66 34 66 40 C 66 46 60 50 54 48 C 48 46 44 42 44 36 C 44 30 48 26 54 27 Z" transform="translate(54,36) scale(0.8) translate(-54,-36)" fill="none" stroke="#ffa500" stroke-width="4" stroke-linejoin="round" opacity="0.3" /> 
+       
+    </g>
+    
+    <!-- Entropy formula (compact, stacked) -->
+    <!-- Entropy formula removed for slide usage (was: H(x) and p(x) expressions) -->
+    
+  </g>
+  
+  <!-- Dice branch -->
+  <g id="diceBranch" data-node-id="dice-branch" role="group" aria-label="Dice-based uncertainty computation branch">
+
+    
+    <!-- Dice visualization showing overlap -->
+    <g class="dice-viz" transform="translate(515, 213) scale(1.15)">
+      <use href="#ctTemplate"/>
+      
+      <!-- Average mask (blue) -->
+      <circle class="dice-avg-mask" cx="52" cy="35" r="8" fill="#0066CC" opacity="0.6"/>
+      
+      <!-- Prediction mask (green) - offset for overlap -->
+      <circle class="dice-pred-mask" cx="56" cy="38" r="8" fill="#66bb6a" opacity="0.6"/>
+      
+      <!-- Intersection highlighting - shows the overlap area -->
+      <g class="dice-intersection" opacity="1">
+        <!-- Redraw masks with lower opacity -->
+        <circle cx="52" cy="35" r="8" fill="#0066CC" opacity="0.3"/>
+        <circle cx="56" cy="38" r="8" fill="#66bb6a" opacity="0.3"/>
+        <!-- Highlight the actual overlap region with bright yellow -->
+        <path d="M 54 30 Q 57 32 58 35 Q 58 38 56 40 Q 53 41 51 39 Q 49 36 50 33 Q 51 31 54 30 Z" fill="#ffb300" opacity="0.95"/>
+      </g>
+      
+      <!-- Union outline -->
+      <g class="dice-union" opacity="0.8">
+        <circle cx="52" cy="35" r="8" fill="none" stroke="#666" stroke-width="1.2" stroke-dasharray="2,1.5"/>
+        <circle cx="56" cy="38" r="8" fill="none" stroke="#666" stroke-width="1.2" stroke-dasharray="2,1.5"/>
+      </g>
+    </g>
+
+    <!-- Dice histogram visualization (improved colors for readability) -->
+    <g transform="translate(640, 238)">
+      <!-- Histogram bars with darker blue for better contrast -->
+      <rect x="0" y="50" width="8" height="10" fill="#003d99" opacity="0.7"/>
+      <rect x="10" y="40" width="8" height="20" fill="#003d99" opacity="0.85"/>
+      <rect x="20" y="20" width="8" height="40" fill="#003d99" opacity="0.95"/>
+      <rect x="30" y="30" width="8" height="30" fill="#003d99" opacity="0.9"/>
+      <rect x="40" y="45" width="8" height="15" fill="#003d99" opacity="0.8"/>
+      <!-- Mean marker: dashed vertical line and bright dot -->
+      <line x1="22" y1="8" x2="22" y2="60" stroke="#ff9800" stroke-width="1.5" stroke-dasharray="2,2" opacity="0.95"/>
+      <circle cx="22" cy="7" r="2" fill="#ff9800" opacity="0.98"/>
+      <text x="22" y="-2" text-anchor="middle" fill="#ff6600" font-size="7" font-weight="bold" stroke="#ffffff" stroke-width="0.5" paint-order="stroke">mean ⟨Dice⟩</text>
+      <line x1="0" y1="60" x2="50" y2="60" stroke="#555" stroke-width="0.8"/>
+      <text x="24" y="72" text-anchor="middle" fill="#222222" font-size="7" stroke="#ffffff" stroke-width="0.4" paint-order="stroke">Dice distribution</text>
+    </g>
+    
+    
+  </g>
+  
+  <!-- Arrow labels for branches -->
+  <text x="485" y="120" text-anchor="middle" fill="#222222" font-size="9">compute H(x)</text>
+  <text x="485" y="235" text-anchor="middle" fill="#222222" font-size="9">compute Dice</text>
+  
+  <!-- Static connections (thinner for zooming) -->
+  <g id="connections">
+    <path class="conn-model-pred" d="M 140 180 L 190 180" stroke="#4a8ec2" stroke-width="1.2" fill="none" opacity="0.7" marker-end="url(#arrowhead)"/>
+    <path class="conn-pred-avg" d="M 298 180 L 375 180" stroke="#4a8ec2" stroke-width="1.2" fill="none" opacity="0.7" marker-end="url(#arrowhead)"/>
+    <path class="conn-avg-entropy" d="M 455 175 Q 490 155 530 150" stroke="#4a8ec2" stroke-width="1.1" fill="none" opacity="0.7" marker-end="url(#arrowhead)"/>
+    <path id="path-avg-dice" class="conn-avg-dice" d="M 455 185 Q 490 215 530 220" stroke="#4a8ec2" stroke-width="1.1" fill="none" opacity="0.7" marker-end="url(#arrowhead)"/>
+  </g>
+
+
+  
+
+  
+  <style>
+    :root { --primary: #4a8ec2; --bg: #1a2a3a; --accent: #66bb6a; --secondary: #64b5f6; --muted: #9fb2c7; }
+    
+    @keyframes flowPrediction {
+      0% { transform: translate(0, 0); }
+      25% { transform: translate(50px, 0); }
+      100% { transform: translate(50px, 0); }
+    }
+    
+    @keyframes pulseRing {
+      0%, 100% { opacity: 0.9; }
+      50% { opacity: 0.5; }
+    }
+    
+    @keyframes highlightIntersection {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.78; }
+    }
+    
+    @keyframes activateConnection {
+      0%, 100% { opacity: 0.4; stroke-width: 1.2; }
+      50% { opacity: 0.85; stroke-width: 1.5; }
+    }
+    
+    .nn-connection {
+      animation: activateConnection 3s ease-in-out infinite;
+    }
+    
+    .nn-connection.layer-1 { animation-delay: 0s; }
+    .nn-connection.layer-2 { animation-delay: 0.5s; }
+    .nn-connection.layer-3 { animation-delay: 1s; }
+    
+    .prediction {
+      animation: flowPrediction 4s ease-in-out infinite;
+    }
+    
+    .prediction:nth-child(2) { animation-delay: 0.8s; }
+    .prediction:nth-child(3) { animation-delay: 1.6s; }
+    .prediction:nth-child(4) { animation-delay: 2.4s; }
+    .prediction:nth-child(5) { animation-delay: 3.2s; }
+    
+    .entropy-ring, .entropy-halo, .entropy-halo-ring, .avg-prob-blob {
+      animation: pulseRing 5s ease-in-out infinite;
+      pointer-events: none;
+    }
+    
+    .dice-intersection {
+      animation: highlightIntersection 3s ease-in-out infinite;
+    }
+    
+    /* Reduced motion fallback */
+    @media (prefers-reduced-motion: reduce) {
+      .prediction, .entropy-ring, .entropy-halo, .dice-intersection, .nn-connection {
+        animation: none !important;
+      }
+    }
+  </style>
+
+  <!-- Entropy and Dice branch labels - positioned next to their visualizations -->
+  <text x="600" y="75" text-anchor="start" fill="#ff9800" font-size="13" font-weight="bold">Entropy H(x)</text>
+  <text x="600" y="215" text-anchor="start" fill="#0066CC" font-size="13" font-weight="bold">Dice Score</text>
+
+  <!-- Clone predictions for continuous flow (scaled) -->
+  <use href="#flowingPredictions > .prediction" style="animation-delay: 0s; transform: scale(0.85);"/>
+  <use href="#flowingPredictions > .prediction" style="animation-delay: 0.8s; transform: scale(0.85);"/>
+  <use href="#flowingPredictions > .prediction" style="animation-delay: 1.6s; transform: scale(0.85);"/>
+  <use href="#flowingPredictions > .prediction" style="animation-delay: 2.4s; transform: scale(0.85);"/>
+  <use href="#flowingPredictions > .prediction" style="animation-delay: 3.2s; transform: scale(0.85);"/>
+</svg>

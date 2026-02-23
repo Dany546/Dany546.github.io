@@ -1,0 +1,375 @@
+/* changelog: rationale: Add minimal scoped roadmap CSS (layout, svg draw, accessible milestones, popover); source: presentation_inline.html L1-L400 */
+
+/* Scoped root */
+[data-roadmap] {
+    display: block;
+    position: relative;
+    font-family: inherit;
+    color: #111827;
+}
+
+[data-roadmap] .roadmap-container {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 1rem;
+}
+
+[data-roadmap] .timeline-wrap {
+    position: relative;
+    height: 140px;
+}
+
+[data-roadmap] svg.timeline {
+    width: 100%;
+    height: 100%;
+    display: block;
+    overflow: visible;
+}
+
+/* SVG timeline stroke defaults */
+[data-roadmap] .timeline-stroke {
+    fill: none;
+    stroke: #6b7280;
+    stroke-width: 2.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+/* Dashed timeline with draw animation */
+[data-roadmap] .timeline-dashed {
+    stroke-dasharray: 8 8;
+    stroke-dashoffset: 0;
+    opacity: 0.95;
+}
+
+[data-roadmap] .timeline-dashed.path-animate {
+    /* large dash length to allow drawing animation */
+    stroke-dasharray: 1000;
+    stroke-dashoffset: 0;
+    animation: none;
+}
+
+@keyframes roadmap-draw {
+    to {
+        stroke-dashoffset: 0;
+    }
+}
+
+/* Milestone buttons (circular, accessible) */
+[data-roadmap] .milestone-button {
+    background: #ffffff;
+    border: 2px solid #111827;
+    color: #111827;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    min-height: 44px;
+    padding: 0;
+    border-radius: 9999px;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+    cursor: pointer;
+    transition: transform 120ms ease, box-shadow 120ms ease;
+}
+
+[data-roadmap] .milestone-button:hover {
+    transform: translateY(-2px);
+}
+
+[data-roadmap] .milestone-button:active {
+    transform: scale(.98);
+}
+
+[data-roadmap] .milestone-button:focus-visible {
+    outline: 3px solid #2563eb;
+    outline-offset: 3px;
+}
+
+/* Popover / card for milestone details */
+[data-roadmap] .milestone-popover {
+    position: absolute;
+    left: 50%;
+    transform: translate(-50%, -120%);
+    background: #ffffff;
+    border-radius: 8px;
+    padding: 0.5rem 0.75rem;
+    box-shadow: 0 6px 18px rgba(15, 23, 42, 0.12);
+    border: 1px solid #e6eef8;
+    min-width: 180px;
+    z-index: 40;
+    font-size: 0.92rem;
+}
+
+[data-roadmap] .milestone-popover::after {
+    content: "";
+    position: absolute;
+    bottom: -6px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 12px;
+    height: 12px;
+    background: #ffffff;
+    border-left: 1px solid #e6eef8;
+    border-bottom: 1px solid #e6eef8;
+    transform-origin: center;
+    transform: translateX(-50%) rotate(45deg);
+}
+
+/* Roadmap popover transition and open state */
+[data-roadmap] .roadmap-pop {
+    opacity: 0;
+    transform: translateY(8px) scale(.98);
+    transition: opacity 220ms ease, transform 220ms ease;
+}
+
+[data-roadmap] .roadmap-pop.open {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+}
+
+/* Support for Motion Path painted highlight when available (no-op otherwise) */
+@supports (offset-path: path('M0 0 L1 1')) {
+    [data-roadmap] .roadmap-highlight {
+        position: absolute;
+        offset-rotate: 0deg;
+    }
+}
+
+/* Utility: visually hide but keep for screen readers */
+[data-roadmap] .sr-only {
+    position: absolute !important;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+/* Reduced motion: disable animations and show timeline fully drawn */
+@media (prefers-reduced-motion: reduce) {
+
+    [data-roadmap] .timeline-dashed.path-animate,
+    [data-roadmap] .milestone-button {
+        animation: none !important;
+        transition: none !important;
+    }
+
+    [data-roadmap] .timeline-dashed,
+    [data-roadmap] .timeline-dashed.path-animate {
+        stroke-dasharray: none !important;
+        stroke-dashoffset: 0 !important;
+    }
+}
+
+/* Highlight indicator that moves along the path */
+[data-roadmap] .roadmap-highlight {
+    position: absolute;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: linear-gradient(180deg, #ffd54d, #ffb300);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.18);
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    transition: transform 360ms cubic-bezier(.2, .8, .2, 1), left 360ms cubic-bezier(.2, .8, .2, 1), top 360ms cubic-bezier(.2, .8, .2, 1);
+    z-index: 50;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    [data-roadmap] .roadmap-highlight {
+        transition: none;
+    }
+}
+
+/* Minimal slide-level styles for embedded roadmap slides
+   These ensure a `.roadmap-bg` element with inline `background-image` displays
+   when slide fragments are injected into the main template. */
+.stage {
+    /* Fill the padded wrapper container */
+    position: relative;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    will-change: auto;
+    margin: 0;
+    padding: 0;
+    z-index: 2;
+}
+
+/* UCL header positioned above the stage */
+.slide-container .ucl-header {
+    position: relative;
+    z-index: 10;
+    margin-bottom: 0;
+}
+
+.roadmap-bg {
+    position: absolute;
+    inset: 0;
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: contain;
+    background-color: rgba(240, 240, 246, 0.6);
+    filter: brightness(.98);
+    z-index: 1;
+    width: 100%;
+    height: 100%;
+}
+
+/* Use an inline <img> for SVG rendering when background-image fails to show */
+.roadmap-img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    object-position: center;
+    pointer-events: none;
+    z-index: 1;
+    background-color: rgba(240, 240, 246, 0.4);
+}
+
+.overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+}
+
+/* Connector SVG layer */
+svg.connectors {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 2;
+}
+
+/* Milestone inline cards placed by data-x/data-y */
+.overlay .milestone {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    pointer-events: auto;
+    display: inline-grid;
+    align-items: center;
+    min-width: 120px;
+    padding: .5rem .8rem;
+    border-radius: 8px;
+    background: #fff;
+    color: #003366;
+    border: 2px solid rgba(49, 130, 206, 0.35);
+    box-shadow: 6px 10px 20px rgba(0, 0, 0, 0.12);
+    z-index: 4;
+}
+
+.overlay .milestone .label {
+    display: block;
+    font-size: 0.95rem;
+    line-height: 1.2;
+}
+
+/* Connector visual elements */
+.connector-line {
+    stroke: #0361bf;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-opacity: 0.9;
+}
+
+.connector-tip {
+    fill: #0361bf;
+}
+
+/* Per-slide milestone color and state configuration via data attributes */
+/* Color override — applies custom border and background color to milestone */
+.overlay .milestone[data-color-override="#0361bf"] {
+    border-color: #0361bf;
+    background: rgba(3, 97, 191, 0.08);
+}
+
+.overlay .milestone[data-color-override="#10b981"] {
+    border-color: #10b981;
+    background: rgba(16, 185, 129, 0.08);
+}
+
+.overlay .milestone[data-color-override="#f59e0b"] {
+    border-color: #f59e0b;
+    background: rgba(245, 158, 11, 0.08);
+}
+
+.overlay .milestone[data-color-override="#a855f7"] {
+    border-color: #a855f7;
+    background: rgba(168, 85, 247, 0.08);
+}
+
+/* Status-based coloring for milestones */
+.overlay .milestone[data-status="published"] {
+    border-color: #10b981;
+    background: rgba(16, 185, 129, 0.08);
+}
+
+.overlay .milestone[data-status="submitted"] {
+    border-color: #f59e0b;
+    background: rgba(245, 158, 11, 0.08);
+}
+
+.overlay .milestone[data-status="ongoing"] {
+    border-color: #0361bf;
+    background: rgba(3, 97, 191, 0.08);
+}
+
+.overlay .milestone[data-status="future"] {
+    border-color: #a855f7;
+    background: rgba(168, 85, 247, 0.08);
+}
+
+/* Expanded/collapsed state for milestone cards */
+.overlay .milestone[data-expanded="true"] {
+    min-width: 180px;
+    min-height: 100px;
+    padding: 1rem;
+}
+
+.overlay .milestone[data-expanded="true"] .label {
+    font-size: 1rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+}
+
+.overlay .milestone[data-expanded="true"]::after {
+    content: attr(data-description);
+    display: block;
+    font-size: 0.85rem;
+    color: #666;
+    margin-top: 0.5rem;
+    line-height: 1.4;
+}
+
+.overlay .milestone[data-expanded="false"] {
+    min-width: 100px;
+    padding: 0.4rem 0.6rem;
+}
+
+.overlay .milestone[data-expanded="false"] .label {
+    font-size: 0.85rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .stage {
+        transition: none !important;
+        will-change: auto !important;
+    }
+}

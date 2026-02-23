@@ -1,0 +1,1010 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <script async src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+  <style>
+    /* changelog: rationale: Improve visual organization for slide 1 (controls left, spacing, stable IDs);
+       source: ESANN/interactive_scatter_abdo1k.html (head style + controls area)
+       changelog: rationale: Make control fonts responsive and keep Q/U inputs on one line; move stats card above controls; source: ESANN/interactive_scatter_abdo1k.html (head style + controls area)
+       changelog: rationale: Align bootstrap CI to one-sided 95% (two-sided 90%) for ESANN consistency; source: ESANN/interactive_scatter_abdo1k.html (renderBootstrapResults); requires_human_approval: true */
+    :root {
+      --bg: #ffffff;
+      --muted: #6b7280;
+      --accent: #0066CC;
+      --success: #2E7D32;
+      --card-border: #e6e9ee;
+      --radius: 6px;
+      --controls-w: 320px;
+      --layout-gap: 20px;
+      --layout-padding: 12px;
+    }
+
+    html,
+    body {
+      height: 100%;
+      width: 100%;
+      /* allow embedding iframes to control sizing */
+      min-height: 0;
+      min-width: 0;
+      overflow: hidden;
+    }
+
+    /* rationale: make base font-size adapt to iframe/container size so controls shrink
+       source: ESANN/interactive_scatter_abdo1k.html (body rule) */
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      color: #222;
+      margin: 0;
+      padding: 0.5rem;
+      font-size: 12px;
+      line-height: 1.4;
+      background: transparent;
+      -webkit-font-smoothing: antialiased;
+      box-sizing: border-box;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    /* Layout containers (absolute/pixel-based sizing so content fits inside iframe) */
+    .layout-right {
+      display: flex;
+      flex-direction: row;
+      gap: var(--layout-gap);
+      /* increased gap for visual separation between plot and controls */
+      align-items: stretch;
+      width: 100%;
+      height: 100%;
+      box-sizing: border-box;
+      overflow: hidden;
+      padding: var(--layout-padding);
+      position: relative;
+    }
+
+    /* Ensure children can shrink inside flexible iframe containers */
+    .layout-right,
+    .controls,
+    .main-controls,
+    #plot {
+      min-width: 0;
+      min-height: 0;
+    }
+
+    .controls {
+      margin-bottom: 0;
+      display: flex;
+      gap: 0.5rem;
+      flex-direction: column;
+      height: 100%;
+      max-height: 100%;
+      overflow-y: auto;
+      overflow-x: hidden;
+      order: -1;
+      /* visually place controls to the left of the plot without changing DOM order */
+    }
+
+    /* Card-like control area for clarity inside iframes */
+    .main-controls {
+      background: var(--bg);
+      border: 1px solid var(--card-border);
+      border-radius: var(--radius);
+      padding: 0.6rem;
+      box-sizing: border-box;
+    }
+
+    /* Controls column sizing - use relative widths so layout scales */
+    .layout-right .controls {
+      /* fixed pixel width so controls never get cropped inside the iframe */
+      flex: none;
+      width: var(--controls-w);
+      min-width: var(--controls-w);
+      overflow-y: auto;
+      margin-left: 0;
+      padding-left: 8px;
+      box-sizing: border-box;
+      font-size: 12px;
+    }
+
+    /* Tighten input/button text inside the controls to reduce visual weight */
+    .layout-right .controls .numeric-input,
+    .layout-right .controls .btn,
+    .layout-right .controls label,
+    .layout-right .controls .helper,
+    .layout-right .controls .stats,
+    .layout-right .controls .value-display {
+      font-size: 12px;
+    }
+
+    .layout-right #plot {
+      /* explicit width relative to controls and gap so plot never overflows */
+      flex: none;
+      width: calc(100% - var(--controls-w) - var(--layout-gap) - (var(--layout-padding) * 2));
+      height: calc(100% - (var(--layout-padding) * 2));
+      min-width: 120px;
+      overflow: hidden;
+      background: transparent;
+      padding: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-sizing: border-box;
+    }
+
+    /* Bootstrap histograms scale relatively and look card-like */
+    #bootstrap-hists {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    #bootstrap-hists>div {
+      flex: 1 1 40%;
+      min-height: 140px;
+      width: 100%;
+      box-sizing: border-box;
+      background: #fff;
+      padding: 0.5rem;
+      border-radius: 0.6vh;
+      border: 1px solid #eee;
+    }
+
+    /* Compact value display */
+    .value-display {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, monospace;
+      font-weight: 600;
+      color: #111827;
+      font-size: 0.9rem;
+      margin-top: 0.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+    }
+
+    .value-display>div {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      flex-wrap: nowrap;
+      white-space: nowrap;
+    }
+
+    .value-display input {
+      font-family: inherit;
+      flex: 0 0 auto;
+    }
+
+    .controls label {
+      margin-right: 0.4rem;
+      font-weight: 600;
+      color: #111827;
+      font-size: 0.9rem;
+    }
+
+    /* Stats summary card */
+    .stats {
+      margin-top: 0.4rem;
+      font-weight: 600;
+      background: #F8FAFC;
+      border-left: 3px solid var(--accent);
+      padding: 0.5rem 0.6rem;
+      border-radius: 0.6vh;
+      color: #0f172a;
+      font-size: 0.9rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.3rem;
+      line-height: 1.2;
+    }
+
+    .controls>.stats {
+      margin-top: 0;
+    }
+
+    /* Buttons */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.4rem 0.6rem;
+      border-radius: 0.6vh;
+      border: 1px solid transparent;
+      font-weight: 700;
+      cursor: pointer;
+      font-size: 0.9rem;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #fff;
+      border-color: #005bb5;
+    }
+
+    .btn-primary:hover {
+      background: #005bb5;
+    }
+
+    .btn-success {
+      background: var(--success);
+      color: #fff;
+      border-color: #27692b;
+    }
+
+    .btn-success:hover {
+      background: #27692b;
+    }
+
+    .btn:focus {
+      outline: none;
+      box-shadow: 0 0 0 0.4vh rgba(0, 102, 204, 0.12);
+    }
+
+    .btn:active {
+      transform: translateY(0.12vh);
+    }
+
+    /* Numeric input styling */
+    .numeric-input {
+      width: 5.2em;
+      max-width: 7em;
+      padding: 0.25rem 0.35rem;
+      border-radius: 0.4rem;
+      border: 1px solid #d1d5db;
+      font-size: 0.9rem;
+      box-sizing: border-box;
+    }
+
+    /* Inline helper text */
+    .helper {
+      font-size: 0.85rem;
+      color: var(--muted);
+      margin-left: 0.5rem;
+    }
+
+    /* Small screens: stack layout - only for very narrow screens */
+    @media (max-width:30em) {
+      .layout-right {
+        flex-direction: column;
+      }
+
+      .layout-right .controls {
+        max-width: 100%;
+        flex: 1 1 auto;
+        margin-left: 0;
+        /* reset negative offset on very small screens */
+      }
+
+      .btn {
+        width: auto;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .btn {
+        transition: none;
+      }
+    }
+
+    /* Final override: ensure all control panel text uses a compact size */
+    .layout-right .controls,
+    .layout-right .controls h3,
+    .layout-right .controls label,
+    .layout-right .controls .numeric-input,
+    .layout-right .controls .btn,
+    .layout-right .controls .helper,
+    .layout-right .controls .stats,
+    .layout-right .controls .value-display {
+      font-size: 11px !important;
+      line-height: 1.2 !important;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="layout-right">
+    <div id="plot" data-element-id="slide1-plot"></div>
+    <div class="controls" role="group" aria-label="Plot controls">
+      <div id="stats" class="stats" aria-live="polite" style="font-size:12px;">
+        Correlation: —
+        Automated: 0 | Reviewed: 0
+        Errors: 0
+
+      </div>
+      <div class="main-controls" data-element-id="slide1-controls">
+        <h3 style="margin:0 0 0.6rem 0; font-size: 12px;">Controls</h3>
+
+        <div class="value-display" aria-live="polite" style="font-size:12px;">
+          <div id="value-decision">Decision threshold (uncertainty) = <input id="decision_val" class="numeric-input"
+              type="number" min="0" max="1" step="0.001" value="0.70" aria-label="Decision value" /></div>
+          <div id="value-quality">Quality threshold (Dice) = <input id="quality_val" class="numeric-input" type="number"
+              min="0" max="1" step="0.01" value="0.70" aria-label="Quality value" /></div>
+        </div>
+
+        <div class="bootstrap-controls"
+          style="margin-top:1.0vh; display:flex; flex-direction:column; gap:0.8vh; align-items:flex-start;">
+          <div style="display:flex; gap:0.8vw; align-items:center; font-size:12px;">
+            <label for="risk-input">Risk:</label>
+            <input id="risk-input" class="numeric-input" type="number" min="0" max="1" step="0.01" value="0.05"
+              aria-label="Risk tolerance">
+            <button id="findu-btn" class="btn btn-success" type="button" aria-describedby="findu-result">Find
+              C*</button>
+            <div id="findu-result" role="status" aria-live="polite"
+              style="font-size:11px; color:#333; margin-left:11px;"> </div>
+          </div>
+
+          <div style="display:flex; gap:0.8vw; font-size:12px; align-items:center;">
+            <label for="bootstrap-iter">Bootstraps: <span class="helper">(resampling)</span></label>
+            <input id="bootstrap-iter" class="numeric-input" type="number" min="50" max="5000" step="50" value="500"
+              aria-label="Bootstrap iterations">
+            <button id="bootstrap-btn" class="btn btn-primary" type="button" aria-describedby="bootstrap-progress">Run
+              bootstrap</button>
+            <div id="bootstrap-progress" role="status" aria-live="polite"
+              style="font-size:11px; color:#666; margin-left:11px;">Ready
+            </div>
+          </div>
+        </div>
+
+        <div id="bootstrap-results" style="margin-top:1.0vh; font-size:1.2vh; color:#333; display:none;">
+          <div id="bootstrap-summary" style="margin-bottom:0.6vh;"></div>
+          <div id="bootstrap-hists" style="display:flex; flex-direction:column; gap:1.0vh;">
+            <div id="bootstrap-hist-g"
+              style="width:100%; background:#fff; padding:0; border-radius:0.6vh; border:0; box-sizing:border-box;">
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <script>
+      var fig = { "data": [{ "x": [0.8467540740966797, 0.5526561141014099, 0.6212645769119263, 0.9167713522911072, 0.896058976650238, 0.9057629108428955, 0.7640664577484131, 0.5018234252929688, 0.9425481557846069, 0.9453164935112, 0.0009345794678665698, 0.9552567005157471, 0.9424826502799988, 0.9241081476211548, 0.5755594968795776, 0.29318416118621826, 0.8326139450073242, 0.6625959873199463, 0.7719131112098694, 0.7939369082450867, 0.9472012519836426, 0.9443081617355347, 0.9336128830909729, 0.888946533203125, 0.955920398235321, 0.7025434970855713, 0.8321738243103027, 0.9559893012046814, 0.8438971042633057, 0.9445630311965942, 0.8737960457801819, 0.2162160575389862, 0.9638363122940063, 0.7786880731582642, 0.8603726029396057, 0.9185404181480408, 0.9332830309867859, 0.125, 0.919723629951477, 0.791745126247406, 0.8982260823249817, 0.9191133975982666, 0.944648802280426, 0.9806686639785767, 0.7103431224822998, 0.906484067440033, 0.8179988265037537, 0.9516104459762573, 0.959591269493103, 0.9532837867736816, 0.9533102512359619, 0.7721143960952759, 0.8471254110336304, 0.21157780289649963, 0.9283180832862854, 0.9297868013381958, 0.8144117593765259, 0.24768716096878052, 0.711627721786499, 0.47758549451828003, 0.125, 0.9093610644340515, 0.8981340527534485, 0.9583606123924255, 0.9195142984390259, 0.8020881414413452, 0.8917282819747925, 0.979404091835022, 0.9422657489776611, 0.83974289894104, 0.47716885805130005, 0.9240903854370117, 0.9123604893684387, 0.926347017288208, 0.9187959432601929, 0.7297331094741821, 0.847127377986908, 0.920849621295929, 0.5, 0.125, 0.625, 0.35256898403167725, 0.6366362571716309, 0.0013760451693087816, 0.0011574074160307646, 0.25, 0.7297468185424805, 0.9163777232170105, 0.5547363758087158, 0.3368910849094391, 0.8851930499076843, 0.9288115501403809, 0.4514457583427429, 0.824578046798706, 0.28403574228286743, 0.7117370367050171, 0.25, 0.9363590478897095, 0.7479937672615051, 0.7489356398582458, 0.42469656467437744, 0.6089635491371155, 0.6697471141815186, 0.9525280594825745, 0.003318584058433771, 0.9517313241958618, 0.8271265029907227, 0.08404096961021423, 0.7140856981277466, 0.9494866132736206, 0.6151375770568848, 0.1326504796743393, 0.9573435187339783, 0.838371753692627, 0.2303127497434616], "y": [0.7694740891456604, 0.2054978907108307, 0.19847556948661804, 0.7299578189849854, 0.4914320707321167, 0.7426214814186096, 0.6342790722846985, 0.37533512711524963, 0.8479565978050232, 0.8682628273963928, 0.0, 0.917102038860321, 0.9294803142547607, 0.8701394200325012, 0.4396665096282959, 0.0, 0.6546340584754944, 0.3778962194919586, 0.32885798811912537, 0.7557424902915955, 0.8373181819915771, 0.8617808222770691, 0.8073214292526245, 0.7365728616714478, 0.8864027857780457, 0.730810821056366, 0.45397448539733887, 0.8535909056663513, 0.8488826751708984, 0.7930731773376465, 0.48618084192276, 0.007317073177546263, 0.8612956404685974, 0.6587351560592651, 0.6667514443397522, 0.7722254395484924, 0.5962182879447937, 0.0, 0.8927924036979675, 0.7238979339599609, 0.7894873023033142, 0.6992168426513672, 0.873047411441803, 0.9371755123138428, 0.5324947834014893, 0.7918367385864258, 0.361638605594635, 0.8857060074806213, 0.8071337938308716, 0.8123246431350708, 0.8515771627426147, 0.0021204757504165173, 0.7574541568756104, 0.026923077180981636, 0.8794360756874084, 0.7558849453926086, 0.6049751043319702, 0.0, 0.5318400263786316, 0.671480119228363, 0.0, 0.78044593334198, 0.5413911938667297, 0.5905494093894958, 0.47554486989974976, 0.5350009202957153, 0.0, 0.9420602321624756, 0.8160477876663208, 0.7697915434837341, 0.5335320234298706, 0.8388668894767761, 0.48670756816864014, 0.8395061492919922, 0.7448405027389526, 0.34929534792900085, 0.6608084440231323, 0.8397594094276428, 0.0, 0.0, 0.0, 0.0, 0.6120996475219727, 0.0, 0.0, 0.0, 0.4156250059604645, 0.7521109580993652, 0.04675551503896713, 0.08671586960554123, 0.8595445156097412, 0.7764822840690613, 0.0, 0.8754342198371887, 0.015195791609585285, 0.7003708481788635, 0.0, 0.884624183177948, 0.12822085618972778, 0.6321055293083191, 0.0, 0.2901715934276581, 0.6285266280174255, 0.8584158420562744, 0.0, 0.8578090667724609, 0.6312005519866943, 0.03539822995662689, 0.18852116167545319, 0.7294240593910217, 0.09528908133506775, 0.0, 0.8196630477905273, 0.561667263507843, 0.0], "mode": "markers", "type": "scatter", "marker": { "color": ["#1f77b4", "#d62728", "#d62728", "#1f77b4", "#d62728", "#1f77b4", "#d62728", "#d62728", "#1f77b4", "#1f77b4", "lightgrey", "#1f77b4", "#1f77b4", "#1f77b4", "#d62728", "lightgrey", "#d62728", "#d62728", "#d62728", "#1f77b4", "#1f77b4", "#1f77b4", "#1f77b4", "#1f77b4", "#1f77b4", "#1f77b4", "#d62728", "#1f77b4", "#1f77b4", "#1f77b4", "#d62728", "lightgrey", "#1f77b4", "#d62728", "#d62728", "#1f77b4", "#d62728", "lightgrey", "#1f77b4", "#1f77b4", "#1f77b4", "#d62728", "#1f77b4", "#1f77b4", "#d62728", "#1f77b4", "#d62728", "#1f77b4", "#1f77b4", "#1f77b4", "#1f77b4", "#d62728", "#1f77b4", "lightgrey", "#1f77b4", "#1f77b4", "#d62728", "lightgrey", "#d62728", "lightgrey", "lightgrey", "#1f77b4", "#d62728", "#d62728", "#d62728", "#d62728", "#d62728", "#1f77b4", "#1f77b4", "#1f77b4", "lightgrey", "#1f77b4", "#d62728", "#1f77b4", "#1f77b4", "#d62728", "#d62728", "#1f77b4", "#d62728", "lightgrey", "#d62728", "lightgrey", "#d62728", "lightgrey", "lightgrey", "lightgrey", "#d62728", "#1f77b4", "#d62728", "lightgrey", "#1f77b4", "#1f77b4", "lightgrey", "#1f77b4", "lightgrey", "#1f77b4", "lightgrey", "#1f77b4", "#d62728", "#d62728", "lightgrey", "#d62728", "#d62728", "#1f77b4", "lightgrey", "#1f77b4", "#d62728", "lightgrey", "#d62728", "#1f77b4", "#d62728", "lightgrey", "#1f77b4", "#d62728", "lightgrey"], "size": 7, "opacity": 0.9 }, "hovertemplate": "%{x:.3f}<br>%{y:.3f}<extra></extra>" }], "layout": { "title": "", "xaxis": { "range": [0, 1], "title": "Confidence" }, "yaxis": { "range": [0, 1], "title": "Dice", "scaleanchor": "x", "scaleratio": 1 }, "shapes": [{ "type": "line", "x0": 0.5, "x1": 0.5, "y0": 0, "y1": 1, "line": { "color": "darkred", "dash": "dash" } }, { "type": "line", "x0": 0, "x1": 1, "y0": 0.7, "y1": 0.7, "line": { "color": "darkgrey", "dash": "dash" } }], "margin": { "l": 60, "r": 20, "t": 20, "b": 60 } } };
+      var xs = [0.8467540740966797, 0.5526561141014099, 0.6212645769119263, 0.9167713522911072, 0.896058976650238, 0.9057629108428955, 0.7640664577484131, 0.5018234252929688, 0.9425481557846069, 0.9453164935112, 0.0009345794678665698, 0.9552567005157471, 0.9424826502799988, 0.9241081476211548, 0.5755594968795776, 0.29318416118621826, 0.8326139450073242, 0.6625959873199463, 0.7719131112098694, 0.7939369082450867, 0.9472012519836426, 0.9443081617355347, 0.9336128830909729, 0.888946533203125, 0.955920398235321, 0.7025434970855713, 0.8321738243103027, 0.9559893012046814, 0.8438971042633057, 0.9445630311965942, 0.8737960457801819, 0.2162160575389862, 0.9638363122940063, 0.7786880731582642, 0.8603726029396057, 0.9185404181480408, 0.9332830309867859, 0.125, 0.919723629951477, 0.791745126247406, 0.8982260823249817, 0.9191133975982666, 0.944648802280426, 0.9806686639785767, 0.7103431224822998, 0.906484067440033, 0.8179988265037537, 0.9516104459762573, 0.959591269493103, 0.9532837867736816, 0.9533102512359619, 0.7721143960952759, 0.8471254110336304, 0.21157780289649963, 0.9283180832862854, 0.9297868013381958, 0.8144117593765259, 0.24768716096878052, 0.711627721786499, 0.47758549451828003, 0.125, 0.9093610644340515, 0.8981340527534485, 0.9583606123924255, 0.9195142984390259, 0.8020881414413452, 0.8917282819747925, 0.979404091835022, 0.9422657489776611, 0.83974289894104, 0.47716885805130005, 0.9240903854370117, 0.9123604893684387, 0.926347017288208, 0.9187959432601929, 0.7297331094741821, 0.847127377986908, 0.920849621295929, 0.5, 0.125, 0.625, 0.35256898403167725, 0.6366362571716309, 0.0013760451693087816, 0.0011574074160307646, 0.25, 0.7297468185424805, 0.9163777232170105, 0.5547363758087158, 0.3368910849094391, 0.8851930499076843, 0.9288115501403809, 0.4514457583427429, 0.824578046798706, 0.28403574228286743, 0.7117370367050171, 0.25, 0.9363590478897095, 0.7479937672615051, 0.7489356398582458, 0.42469656467437744, 0.6089635491371155, 0.6697471141815186, 0.9525280594825745, 0.003318584058433771, 0.9517313241958618, 0.8271265029907227, 0.08404096961021423, 0.7140856981277466, 0.9494866132736206, 0.6151375770568848, 0.1326504796743393, 0.9573435187339783, 0.838371753692627, 0.2303127497434616];
+      var ys = [0.7694740891456604, 0.2054978907108307, 0.19847556948661804, 0.7299578189849854, 0.4914320707321167, 0.7426214814186096, 0.6342790722846985, 0.37533512711524963, 0.8479565978050232, 0.8682628273963928, 0.0, 0.917102038860321, 0.9294803142547607, 0.8701394200325012, 0.4396665096282959, 0.0, 0.6546340584754944, 0.3778962194919586, 0.32885798811912537, 0.7557424902915955, 0.8373181819915771, 0.8617808222770691, 0.8073214292526245, 0.7365728616714478, 0.8864027857780457, 0.730810821056366, 0.45397448539733887, 0.8535909056663513, 0.8488826751708984, 0.7930731773376465, 0.48618084192276, 0.007317073177546263, 0.8612956404685974, 0.6587351560592651, 0.6667514443397522, 0.7722254395484924, 0.5962182879447937, 0.0, 0.8927924036979675, 0.7238979339599609, 0.7894873023033142, 0.6992168426513672, 0.873047411441803, 0.9371755123138428, 0.5324947834014893, 0.7918367385864258, 0.361638605594635, 0.8857060074806213, 0.8071337938308716, 0.8123246431350708, 0.8515771627426147, 0.0021204757504165173, 0.7574541568756104, 0.026923077180981636, 0.8794360756874084, 0.7558849453926086, 0.6049751043319702, 0.0, 0.5318400263786316, 0.671480119228363, 0.0, 0.78044593334198, 0.5413911938667297, 0.5905494093894958, 0.47554486989974976, 0.5350009202957153, 0.0, 0.9420602321624756, 0.8160477876663208, 0.7697915434837341, 0.5335320234298706, 0.8388668894767761, 0.48670756816864014, 0.8395061492919922, 0.7448405027389526, 0.34929534792900085, 0.6608084440231323, 0.8397594094276428, 0.0, 0.0, 0.0, 0.0, 0.6120996475219727, 0.0, 0.0, 0.0, 0.4156250059604645, 0.7521109580993652, 0.04675551503896713, 0.08671586960554123, 0.8595445156097412, 0.7764822840690613, 0.0, 0.8754342198371887, 0.015195791609585285, 0.7003708481788635, 0.0, 0.884624183177948, 0.12822085618972778, 0.6321055293083191, 0.0, 0.2901715934276581, 0.6285266280174255, 0.8584158420562744, 0.0, 0.8578090667724609, 0.6312005519866943, 0.03539822995662689, 0.18852116167545319, 0.7294240593910217, 0.09528908133506775, 0.0, 0.8196630477905273, 0.561667263507843, 0.0];
+
+      // ranking function with average ranks for ties (used for Spearman computation)
+      function ranks(arr) {
+        var pairs = arr.map((v, i) => ({ v: v, i: i }));
+        pairs.sort((a, b) => a.v - b.v);
+        var r = new Array(arr.length);
+        var i = 0;
+        while (i < pairs.length) {
+          var j = i;
+          while (j + 1 < pairs.length && pairs[j + 1].v === pairs[i].v) j++;
+          var avgRank = (i + j) / 2 + 1; // 1-based ranks
+          for (var k = i; k <= j; k++) r[pairs[k].i] = avgRank;
+          i = j + 1;
+        }
+        return r;
+      }
+
+      // Precompute global Spearman rank correlation once (constant for the dataset)
+      (function computeGlobalSpearman() {
+        var corr = '—';
+        if (xs.length >= 2) {
+          var rx = ranks(xs);
+          var ry = ranks(ys);
+          var meanRx = rx.reduce((a, b) => a + b, 0) / rx.length;
+          var meanRy = ry.reduce((a, b) => a + b, 0) / ry.length;
+          var num = 0, denRx = 0, denRy = 0;
+          for (var j = 0; j < rx.length; j++) {
+            var dx = rx[j] - meanRx;
+            var dy = ry[j] - meanRy;
+            num += dx * dy;
+            denRx += dx * dx;
+            denRy += dy * dy;
+          }
+          var denom = Math.sqrt(denRx * denRy);
+          if (denom !== 0) corr = (num / denom).toFixed(3);
+          else corr = 'NaN';
+        }
+        window.GLOBAL_SPEARMAN = corr;
+      })();
+
+      // Mode detection (allow ?mode=intro or ?mode=methods) - controls visibility and layout
+      (function detectMode() {
+        var m = null; try { m = (new URLSearchParams(window.location.search)).get('mode'); } catch (e) { }
+        if (!m && location.hash) m = location.hash.slice(1);
+        window.MODE = m || 'full';
+        document.documentElement.setAttribute('data-embed-mode', window.MODE);
+        // hide bootstrap controls in compact intro embeds
+        if (window.MODE === 'intro') {
+          var bc = document.querySelector('.bootstrap-controls'); if (bc) bc.style.display = 'none';
+          var br = document.getElementById('bootstrap-results'); if (br) br.style.display = 'none';
+          var findbu = document.getElementById('findu-btn'); if (findbu) findbu.style.display = 'none';
+          // For compact intro embeds, default both thresholds to 0.5
+          try {
+            var dv = document.getElementById('decision_val');
+            if (dv) { if (dv.tagName === 'INPUT') dv.value = '0.50'; else dv.innerText = '0.50'; }
+            var qv = document.getElementById('quality_val');
+            if (qv) { if (qv.tagName === 'INPUT') qv.value = '0.50'; else qv.innerText = '0.50'; }
+            if (typeof fig !== 'undefined' && fig && fig.layout && Array.isArray(fig.layout.shapes) && fig.layout.shapes.length >= 2) {
+              fig.layout.shapes[0].x0 = fig.layout.shapes[0].x1 = 0.5;
+              fig.layout.shapes[1].y0 = fig.layout.shapes[1].y1 = 0.5;
+            }
+          } catch (e) { /* silent fallback */ }
+        }
+      })();
+
+      // cache for precomputed bootstrap JSON per requested quality value (qKey -> data|null)
+      var PRECOMP_CACHE = {};
+      var PRECOMP_PROMISES = {};
+      var PRECOMP_ALL = undefined; // combined JSON with multiple Qs, e.g. { by_q: {"0.70": {...}, "0.72": {...} } }
+      var PRECOMP_MATCH = {}; // maps requested qKey -> matched available qKey
+
+      // Helper accessors for decision and quality elements/values. Allows the UI to work
+      // when the range sliders (#decision/#quality) are absent and only the numeric
+      // inputs (#decision_val/#quality_val) are present.
+      function getDecisionEl() { return document.getElementById('decision') || document.getElementById('decision_val'); }
+      function getQualityEl() { return document.getElementById('quality') || document.getElementById('quality_val'); }
+      function getDecisionValue() { var el = getDecisionEl(); return el ? parseFloat(el.value) : 0.5; }
+      function getQualityValue() { var el = getQualityEl(); return el ? parseFloat(el.value) : 0.7; }
+
+      function findNearestAvailableQ(requestQ) {
+        if (!PRECOMP_ALL || !PRECOMP_ALL.by_q) return null;
+        var avail = Object.keys(PRECOMP_ALL.by_q);
+        if (!avail || avail.length === 0) return null;
+        var rq = parseFloat(requestQ);
+        var best = null;
+        var bestDiff = Infinity;
+        for (var i = 0; i < avail.length; i++) {
+          var k = avail[i];
+          var v = parseFloat(k);
+          var diff = Math.abs(v - rq);
+          if (diff < bestDiff) { bestDiff = diff; best = k; }
+        }
+        return best; // string key like '0.70'
+      }
+
+      // ensurePrecomputedLoaded returns a Promise that resolves to { matchedQ, data } or { matchedQ: null, data: null }
+      // It fetches a single combined precomputed file 'precomputed_bootstrap_all.json' once, then selects the nearest available Q.
+      function ensurePrecomputedLoaded(qKey) {
+        if (PRECOMP_CACHE[qKey] !== undefined) return Promise.resolve({ matchedQ: PRECOMP_MATCH[qKey] || qKey, data: PRECOMP_CACHE[qKey] });
+        // If combined data already loaded, find nearest available Q and return that
+        if (typeof PRECOMP_ALL !== 'undefined') {
+          var nearest = findNearestAvailableQ(qKey);
+          if (!nearest) { PRECOMP_CACHE[qKey] = null; PRECOMP_MATCH[qKey] = null; return Promise.resolve({ matchedQ: null, data: null }); }
+          PRECOMP_CACHE[qKey] = PRECOMP_ALL.by_q[nearest] || null;
+          PRECOMP_MATCH[qKey] = nearest;
+          return Promise.resolve({ matchedQ: nearest, data: PRECOMP_CACHE[qKey] });
+        }
+        // If a fetch for the combined file is already in flight, wait for it and then retry
+        if (PRECOMP_PROMISES['ALL']) return PRECOMP_PROMISES['ALL'].then(function () { return ensurePrecomputedLoaded(qKey); });
+        // otherwise fetch the combined file
+        PRECOMP_PROMISES['ALL'] = (function () {
+          var pathAll = new URL('precomputed_bootstrap_all.json', location.href).href;
+          console.debug('Loading combined precomputed JSON from', pathAll);
+          return fetch(pathAll).then(function (r) {
+            if (!r.ok) throw new Error('no combined precompute file');
+            return r.json();
+          }).then(function (data) {
+            PRECOMP_ALL = data || {};
+            PRECOMP_PROMISES['ALL'] = null;
+            return ensurePrecomputedLoaded(qKey);
+          }).catch(function (err) {
+            console.warn('Combined precompute load failed', err);
+            PRECOMP_ALL = null;
+            PRECOMP_PROMISES['ALL'] = null;
+            PRECOMP_CACHE[qKey] = null; PRECOMP_MATCH[qKey] = null;
+            return { matchedQ: null, data: null };
+          });
+        })();
+        return PRECOMP_PROMISES['ALL'];
+      }
+
+      // Find the nearest precomputed threshold entry for the given quality key and decision.
+      // Returns the threshold object (with fields like t, median_r, r_low, r_high) or null if
+      // precomputed data is not available yet.
+      function findNearestPrecomputedEntry(qKey, decision) {
+        var data = PRECOMP_CACHE[qKey];
+        if (!data || !Array.isArray(data.thresholds) || data.thresholds.length === 0) return null;
+        var thresholds = data.thresholds;
+        var best = null;
+        var bestDiff = Infinity;
+        var eps = 1e-9;
+        for (var i = 0; i < thresholds.length; i++) {
+          var t = thresholds[i].t;
+          var diff = Math.abs(t - decision);
+          if (diff < bestDiff) { bestDiff = diff; best = thresholds[i]; }
+          if (diff <= eps) break;
+        }
+        return best;
+      }
+
+      function ensurePlotlyThenRun(fn, timeoutMs) {
+        timeoutMs = (typeof timeoutMs === 'number') ? timeoutMs : 5000;
+        if (window.Plotly) return fn();
+        var waited = 0;
+        var iv = setInterval(function () {
+          if (window.Plotly) { clearInterval(iv); fn(); return; }
+          waited += 100;
+          if (waited >= timeoutMs) { clearInterval(iv); var plotDiv = document.getElementById('plot'); if (plotDiv) plotDiv.innerHTML = '<p style="color:#c00">Interactive plot unavailable — plotly could not be loaded.</p>'; }
+        }, 100);
+      }
+
+      // Small scheduling state to batch Plotly updates
+      var rafPending = false;
+      var pendingRender = { colors: null, decision: null, quality: null };
+
+      function runPlot() {
+        var plotDiv = document.getElementById('plot');
+        var layoutRight = document.querySelector('.layout-right');
+
+        // Calculate available space for plot (accounting for controls width and gaps)
+        function getAvailableSpace() {
+          if (!plotDiv || !layoutRight) return { width: Math.round(window.innerWidth * 0.5), height: Math.round(window.innerHeight * 0.5) };
+          var containerWidth = layoutRight.clientWidth || Math.round(window.innerWidth * 0.8);
+          var containerHeight = layoutRight.clientHeight || Math.round(window.innerHeight * 0.72);
+
+          // Ensure we have valid dimensions
+          if (containerWidth < Math.round(window.innerWidth * 0.2) || containerHeight < Math.round(window.innerHeight * 0.12)) {
+            containerWidth = Math.round(window.innerWidth * 0.8);
+            containerHeight = Math.round(window.innerHeight * 0.72);
+          }
+
+          // Get actual controls width from DOM
+          var controlsEl = document.querySelector('.controls');
+          var controlsWidth = controlsEl ? controlsEl.offsetWidth : Math.round(containerWidth * 0.28);
+
+          // Read actual gap from CSS (keeps JS in sync with layout-right gap)
+          var gap = 0;
+          try {
+            var cs = getComputedStyle(layoutRight || document.querySelector('.layout-right'));
+            gap = parseFloat(cs.gap || cs.columnGap) || Math.round(window.innerWidth * 0.01);
+          } catch (e) { gap = Math.round(window.innerWidth * 0.01); }
+          // small internal padding inside the plot card (read from computed style so CSS vh/vw is respected)
+          var padding = 0;
+          try { padding = parseFloat(getComputedStyle(plotDiv).paddingLeft) || Math.round(window.innerHeight * 0.006); } catch (e) { padding = Math.round(window.innerHeight * 0.006); }
+
+          var minAvailable = Math.round(window.innerWidth * 0.18);
+          // leave an extra safety margin so controls never get cropped inside narrow embeds
+          var safetyMargin = 40; // px
+          var availableWidth = Math.max(minAvailable, containerWidth - controlsWidth - gap - padding * 2 - safetyMargin);
+          // Cap maximum plot size to avoid dominating the column and to preserve space for controls
+          // Set to 480px to enforce requested fixed plot maximum width
+          var maxPlotPx = 480;
+          // Make it square, but respect container height
+          var size = Math.min(availableWidth, containerHeight - padding * 2, maxPlotPx);
+          size = Math.max(Math.round(window.innerHeight * 0.18), size); // Ensure minimum size relative to viewport
+          return { width: size, height: size };
+        }
+
+        // Set initial size
+        function updatePlotSize() {
+          if (!plotDiv) return;
+          var space = getAvailableSpace();
+          plotDiv.style.width = space.width + 'px';
+          plotDiv.style.height = space.height + 'px';
+        }
+
+        updatePlotSize();
+
+        // Create plot with explicit dimensions; reduce right margin so the drawn area extends
+        var space = getAvailableSpace();
+        var baseMargin = (fig.layout && fig.layout.margin) ? Object.assign({}, fig.layout.margin) : { l: 60, r: 20, t: 20, b: 60 };
+        var defaultR = Math.round(window.innerWidth * 0.012);
+        var preferR = baseMargin.r || Math.round(window.innerWidth * 0.02);
+        baseMargin.r = Math.min(preferR, defaultR); // favor a small right margin scaled to viewport
+        var layout = Object.assign({}, fig.layout, {
+          width: space.width,
+          height: space.height,
+          autosize: false,
+          margin: baseMargin
+        });
+
+        Plotly.newPlot(plotDiv, fig.data, layout, {
+          responsive: false,
+          editable: true,
+          displayModeBar: false
+        });
+
+        // Track resize with debounce
+        var resizeTimeout = null;
+        function onResize() {
+          if (resizeTimeout) clearTimeout(resizeTimeout);
+          resizeTimeout = setTimeout(function () {
+            updatePlotSize();
+            if (window.Plotly && plotDiv) {
+              try {
+                var newSpace = getAvailableSpace();
+                Plotly.relayout(plotDiv, {
+                  width: newSpace.width,
+                  height: newSpace.height
+                });
+              } catch (e) { /* ignore */ }
+            }
+          }, 100);
+        }
+
+        // Listen to window resize
+        window.addEventListener('resize', onResize);
+
+        // Also observe the layout-right container for size changes (handles iframe resizing)
+        if (layoutRight && window.ResizeObserver) {
+          var resizeObserver = new ResizeObserver(function () {
+            onResize();
+          });
+          resizeObserver.observe(layoutRight);
+        }
+
+        plotDiv.on('plotly_relayout', function (eventData) {
+          // eventData contains e.g. {'shapes[0].x0': 0.42} when a vertical line has been moved
+          var decision = null;
+          var quality = null;
+
+          if (eventData['shapes[0].x0'] !== undefined) decision = eventData['shapes[0].x0'];
+          if (eventData['shapes[0].x1'] !== undefined && decision === null) decision = eventData['shapes[0].x1'];
+          if (eventData['shapes[1].y0'] !== undefined) quality = eventData['shapes[1].y0'];
+          if (eventData['shapes[1].y1'] !== undefined && quality === null) quality = eventData['shapes[1].y1'];
+
+          // Fall back to current slider values if event didn't contain both
+          if (decision === null) decision = getDecisionValue();
+          if (quality === null) quality = getQualityValue();
+
+          // Bound and format
+          decision = Math.max(0, Math.min(1, decision));
+          quality = Math.max(0, Math.min(1, quality));
+
+          // Update sliders visually and update point colors (reuse existing update())
+          var sliderDecision = document.getElementById('decision'); if (sliderDecision && sliderDecision.tagName === 'INPUT') sliderDecision.value = decision.toFixed(2);
+          var sliderQuality = document.getElementById('quality'); if (sliderQuality && sliderQuality.tagName === 'INPUT') sliderQuality.value = quality.toFixed(2);
+          var dv = document.getElementById('decision_val'); if (dv) { if (dv.tagName === 'INPUT') dv.value = decision.toFixed(2); else dv.innerText = decision.toFixed(2); }
+          var qv = document.getElementById('quality_val'); if (qv) { if (qv.tagName === 'INPUT') qv.value = quality.toFixed(2); else qv.innerText = quality.toFixed(2); }
+          update(decision, quality);
+        });
+      }
+
+      function update(decision, quality) {
+        // update left-side numeric display
+        var dv = document.getElementById('decision_val'); if (dv) { if (dv.tagName === 'INPUT') dv.value = decision.toFixed(3); else dv.innerText = decision.toFixed(2); }
+        var qv = document.getElementById('quality_val'); if (qv) { if (qv.tagName === 'INPUT') qv.value = quality.toFixed(2); else qv.innerText = quality.toFixed(2); }
+
+        var colors = [];
+        var countBlue = 0, countRed = 0, countGrey = 0;
+        var selXs = [], selYs = [];
+        for (var i = 0; i < xs.length; i++) {
+          if (xs[i] < decision) {
+            colors.push('lightgrey');
+            countGrey++;
+          } else if (ys[i] >= quality) {
+            colors.push('#1f77b4');
+            countBlue++;
+            selXs.push(xs[i]); selYs.push(ys[i]);
+          } else {
+            colors.push('#d62728');
+            countRed++;
+            selXs.push(xs[i]); selYs.push(ys[i]);
+          }
+        }
+
+        // expose a helper to trigger bootstrap with current thresholds (populated later with observed risk)
+
+        // enable/disable bootstrap button depending on dataset
+        var bbtn = document.getElementById('bootstrap-btn');
+        if (bbtn) bbtn.disabled = false;
+
+        // Schedule Plotly updates via requestAnimationFrame to avoid blocking
+        pendingRender.colors = colors;
+        pendingRender.decision = decision;
+        pendingRender.quality = quality;
+        if (!rafPending) {
+          rafPending = true;
+          requestAnimationFrame(function () {
+            if (window.Plotly) {
+              try {
+                var plotEl = document.getElementById('plot');
+                if (plotEl && plotEl.data && plotEl.data[0] && Array.isArray(plotEl.data[0].x)) {
+                  // ensure color array length matches trace point count
+                  var expected = plotEl.data[0].x.length;
+                  var colorsArr = Array.isArray(pendingRender.colors) ? pendingRender.colors.slice() : [];
+                  if (colorsArr.length !== expected) {
+                    console.warn('Plotly color length mismatch: expected', expected, 'got', colorsArr.length);
+                    // truncate or pad with neutral color
+                    colorsArr = colorsArr.slice(0, expected);
+                    while (colorsArr.length < expected) colorsArr.push('lightgrey');
+                  }
+                  Plotly.restyle(plotEl, { 'marker.color': [colorsArr] });
+                  Plotly.relayout(plotEl, {
+                    'shapes[0].x0': pendingRender.decision,
+                    'shapes[0].x1': pendingRender.decision,
+                    'shapes[1].y0': pendingRender.quality,
+                    'shapes[1].y1': pendingRender.quality,
+                  });
+                } else {
+                  console.warn('Plotly update skipped: plot element or data not ready');
+                }
+              } catch (err) {
+                console.error('Plotly update error:', err);
+              }
+            }
+            rafPending = false;
+          });
+        }
+
+
+        // compute percentages for counts (these depend on thresholds)
+        var total = xs.length || 1;
+        var pctBlue = ((countBlue / total) * 100).toFixed(1) + '%';
+        var pctRed = ((countRed / total) * 100).toFixed(1) + '%';
+        var pctGrey = ((countGrey / total) * 100).toFixed(1) + '%';
+
+        // observed risk across total points (red / total)
+        var accepted = countBlue + countRed;
+        var observedRisk = (total === 0) ? 0 : (countRed / total);
+
+        // ensure precomputed data for this quality is being loaded (lazy) and refresh when it arrives
+        var qKey = quality.toFixed(2);
+        var preEntry = (PRECOMP_CACHE[qKey] && findNearestPrecomputedEntry(qKey, decision)) || null;
+        var hadPreEntry = !!preEntry;
+        ensurePrecomputedLoaded(qKey).then(function (res) {
+          if (!hadPreEntry) {
+            var nowEntry = findNearestPrecomputedEntry(qKey, decision);
+            if (nowEntry) update(decision, quality); // refresh once when precomputed data becomes available
+          }
+        });
+
+        // Build stats text: prefer precomputed CI for risk when available, otherwise show observed risk (no CI)
+        var statsText = 'Correlation: ' + (typeof GLOBAL_SPEARMAN !== 'undefined' ? GLOBAL_SPEARMAN : '—') + '\nAutomated: ' + pctBlue + '  |  Reviewed: ' + pctGrey + '\nErrors: ' + pctRed;
+
+        var matchedQ = PRECOMP_MATCH[qKey] || null;
+        // if (preEntry) {
+        //   // show only the median precomputed risk and which Q was used
+        //   statsText += '  | Risk r: median ' + preEntry.median_r.toFixed(3) + (matchedQ ? ' (Q=' + matchedQ + ')' : '');
+        // } else {
+        //   statsText += '  | Risk: ' + observedRisk.toFixed(3);
+        // }
+
+        // expose a helper to trigger bootstrap with current thresholds (including observed risk)
+        window.LAST_SELECTION = { decision: decision, quality: quality, countBlue: countBlue, countRed: countRed, countGrey: countGrey, observedRisk: observedRisk };
+
+        document.getElementById('stats').innerText = statsText;
+      }
+
+      ensurePlotlyThenRun(function () {
+        // create plot then attach listeners
+        runPlot();
+
+        (function attachAdaptiveInputs() {
+          var decisionEl = getDecisionEl();
+          var qualityEl = getQualityEl();
+          if (decisionEl) {
+            decisionEl.addEventListener('input', function (e) {
+              var dv = parseFloat(e.target.value);
+              var qv = qualityEl ? parseFloat(qualityEl.value) : getQualityValue();
+              update(dv, qv);
+            });
+          }
+          if (qualityEl) {
+            qualityEl.addEventListener('input', function (e) {
+              var qv = parseFloat(e.target.value);
+              var dv = decisionEl ? parseFloat(decisionEl.value) : getDecisionValue();
+              update(dv, qv);
+            });
+          }
+        })();
+
+        // Initialize display with current slider/numeric values
+        update(getDecisionValue(), getQualityValue());
+
+        // allow direct editing of displayed numeric values and sync with sliders/plot
+        var valDecisionInput = document.getElementById('decision_val');
+        var valQualityInput = document.getElementById('quality_val');
+        if (valDecisionInput && valDecisionInput.tagName === 'INPUT') {
+          valDecisionInput.addEventListener('input', function (e) {
+            var v = parseFloat(e.target.value);
+            if (isNaN(v)) return;
+            v = Math.max(0, Math.min(1, v));
+            var slider = document.getElementById('decision'); if (slider && slider.tagName === 'INPUT') slider.value = v.toFixed(2);
+            try { var plotEl = document.getElementById('plot'); if (window.Plotly && plotEl) Plotly.relayout(plotEl, { 'shapes[0].x0': v, 'shapes[0].x1': v }); } catch (err) { /* ignore */ }
+            update(v, getQualityValue());
+          });
+        }
+        if (valQualityInput && valQualityInput.tagName === 'INPUT') {
+          valQualityInput.addEventListener('input', function (e) {
+            var v = parseFloat(e.target.value);
+            if (isNaN(v)) return;
+            v = Math.max(0, Math.min(1, v));
+            var slider = document.getElementById('quality'); if (slider && slider.tagName === 'INPUT') slider.value = v.toFixed(2);
+            try { var plotEl = document.getElementById('plot'); if (window.Plotly && plotEl) Plotly.relayout(plotEl, { 'shapes[1].y0': v, 'shapes[1].y1': v }); } catch (err) { /* ignore */ }
+            update(getDecisionValue(), v);
+          });
+        }
+
+        // bootstrap button action
+        var bootstrapBtn = document.getElementById('bootstrap-btn');
+        var bootstrapIterInput = document.getElementById('bootstrap-iter');
+        var bootstrapProgress = document.getElementById('bootstrap-progress');
+        var bootstrapResults = document.getElementById('bootstrap-results');
+        var bootstrapSummary = document.getElementById('bootstrap-summary');
+        function formatPct(v) { return (v * 100).toFixed(1) + '%'; }
+
+        function computeCI(arr, alpha) {
+          var copies = arr.slice();
+          copies.sort(function (a, b) { return a - b; });
+          var n = copies.length;
+          var low = copies[Math.floor((alpha / 2) * (n - 1))];
+          var high = copies[Math.ceil((1 - (alpha / 2)) * (n - 1))];
+          var med = copies[Math.floor(0.5 * (n - 1))];
+          return { low: low, med: med, high: high };
+        }
+
+        function runBootstrapAsync(decision, quality, iterations, onProgress, onDone) {
+          iterations = Math.max(1, parseInt(iterations, 10) || 100);
+          var N = xs.length;
+          var gains = [];
+          var risks = [];
+          var i = 0;
+          var batchSize = 50; // process 50 samples per tick
+          function step() {
+            var end = Math.min(i + batchSize, iterations);
+            for (; i < end; i++) {
+              var accepted = 0; var incorrect = 0; var correct = 0;
+              for (var j = 0; j < N; j++) {
+                var idx = Math.floor(Math.random() * N);
+                if (xs[idx] >= decision) {
+                  accepted++;
+                  if (ys[idx] < quality) {
+                    incorrect++;
+                  } else {
+                    correct++;
+                  }
+                }
+              }
+              var g = correct / N; // automation gain - only blue dots (correct automated)
+              var r = (accepted === 0) ? 0 : (incorrect / accepted); // risk on accepted
+              gains.push(g); risks.push(r);
+            }
+            if (onProgress) onProgress(i / iterations);
+            if (i < iterations) setTimeout(step, 0);
+            else onDone(gains, risks);
+          }
+          step();
+        }
+
+        function renderBootstrapResults(gains, risks, decision, quality) {
+          bootstrapResults.style.display = 'block';
+          var gci = computeCI(gains, 0.10);
+          var rci = computeCI(risks, 0.10);
+          bootstrapSummary.innerHTML = '<strong>Automation gain G:</strong> median ' + formatPct(gci.med) + ', 90% CI [' + formatPct(gci.low) + ', ' + formatPct(gci.high) + ']<br>'
+            // + '<strong>Risk r:</strong> median ' + rci.med.toFixed(3) + ', 95% CI [' + rci.low.toFixed(3) + ', ' + rci.high.toFixed(3) + ']'
+            ;
+
+          // show histograms using Plotly with CI bound lines
+          try {
+            Plotly.react('bootstrap-hist-g', [{ x: gains, type: 'histogram', histnorm: 'probability', marker: { color: '#1f77b4' } }], {
+              margin: { t: 20, l: 40, r: 10, b: 40 },
+              xaxis: { title: 'Automation gain (G)' },
+              yaxis: { title: '', tickformat: '.1%' },
+              shapes: [
+                { type: 'line', x0: gci.low, x1: gci.low, y0: 0, y1: 1, yref: 'paper', line: { color: '#666', dash: 'dash', width: 2 } },
+                { type: 'line', x0: gci.high, x1: gci.high, y0: 0, y1: 1, yref: 'paper', line: { color: '#666', dash: 'dash', width: 2 } },
+                { type: 'line', x0: gci.med, x1: gci.med, y0: 0, y1: 1, yref: 'paper', line: { color: '#333', dash: 'dot', width: 2 } }
+              ]
+            }, { displayModeBar: false });
+            // Plotly.react('bootstrap-hist-r', [{ x: risks, type: 'histogram', histnorm: 'probability', marker: { color: '#d62728' } }], { margin: { t: 20, l: 40, r: 10, b: 40 }, xaxis: { title: 'Risk' }, yaxis: { title: '', tickformat: '.1%' } }, { displayModeBar: false });
+          } catch (e) {
+            console.warn('Plotly hist error', e);
+          }
+        }
+
+        if (bootstrapBtn) {
+          bootstrapBtn.addEventListener('click', function () {
+            var iter = bootstrapIterInput ? parseInt(bootstrapIterInput.value, 10) : 500;
+            var decision = getDecisionValue();
+            var quality = getQualityValue();
+            bootstrapBtn.disabled = true;
+            bootstrapProgress.innerText = 'Starting...';
+            // run async bootstrap
+            runBootstrapAsync(decision, quality, iter, function (p) {
+              bootstrapProgress.innerText = 'Progress: ' + Math.round(p * 100) + '%';
+            }, function (gains, risks) {
+              bootstrapProgress.innerText = 'Done';
+              bootstrapBtn.disabled = false;
+              renderBootstrapResults(gains, risks, decision, quality);
+            });
+          });
+        }
+
+        // FIND U* using precomputed JSON for the current Q
+        var finduBtn = document.getElementById('findu-btn');
+        var riskInput = document.getElementById('risk-input');
+        var finduResult = document.getElementById('findu-result');
+
+        function formatRange(low, med, high, isPct) {
+          if (isPct) return med + ' (CI ' + low + '–' + high + ')';
+          return med + ' (CI ' + low + '–' + high + ')';
+        }
+
+        if (finduBtn) {
+          finduBtn.addEventListener('click', function () {
+            var R = parseFloat(riskInput.value);
+            var Q = getQualityValue();
+            finduResult.innerText = 'Searching for optimal C* across quality thresholds ≥ ' + Q.toFixed(2) + '...';
+
+            // Load combined precomputed data
+            ensurePrecomputedLoaded(Q.toFixed(2)).then(function () {
+              if (!PRECOMP_ALL || !PRECOMP_ALL.by_q) {
+                finduResult.innerText = 'No precomputed data available. Run precompute script.';
+                return;
+              }
+
+              // Get all quality thresholds >= Q
+              var allQs = Object.keys(PRECOMP_ALL.by_q).map(parseFloat).filter(function (q) { return q >= Q - 1e-9; }).sort(function (a, b) { return a - b; });
+              if (allQs.length === 0) {
+                finduResult.innerText = 'No precomputed quality thresholds found ≥ ' + Q.toFixed(2);
+                return;
+              }
+
+              // Search across all Q >= requested Q for the smallest t with r <= R
+              var bestCandidate = null;
+              var bestQ = null;
+
+              for (var i = 0; i < allQs.length; i++) {
+                var qVal = allQs[i];
+                var qKey = qVal.toFixed(2);
+                var data = PRECOMP_ALL.by_q[qKey];
+                if (!data || !Array.isArray(data.thresholds)) continue;
+
+                // Filter out impractical thresholds
+                var practicalThresholds = data.thresholds.filter(function (s) { return s.t < 0.98; });
+                if (practicalThresholds.length === 0) continue;
+
+                // Check if all r_high are zero
+                var allZeroRhigh = practicalThresholds.every(function (s) { return s.r_high < 1e-9; });
+
+                // Find candidates meeting risk constraint
+                var candidates;
+                if (allZeroRhigh) {
+                  candidates = practicalThresholds.filter(function (s) { return s.median_r <= R + 1e-12; });
+                } else {
+                  candidates = practicalThresholds.filter(function (s) { return s.r_high <= R + 1e-12; });
+                }
+
+                if (candidates.length > 0) {
+                  // Sort by t and pick smallest
+                  candidates.sort(function (a, b) { return a.t - b.t; });
+                  var candidate = candidates[0];
+
+                  // Keep this candidate if it has smaller t than current best
+                  if (!bestCandidate || candidate.t < bestCandidate.t) {
+                    bestCandidate = candidate;
+                    bestQ = qVal;
+                  }
+                }
+              }
+
+              if (!bestCandidate) {
+                finduResult.innerText = 'No threshold found satisfying R=' + R.toFixed(3) + ' for any Q ≥ ' + Q.toFixed(2);
+                return;
+              }
+
+              // Update plot with chosen thresholds
+              update(bestCandidate.t, bestQ);
+              try {
+                var plotEl = document.getElementById('plot');
+                if (window.Plotly && plotEl) {
+                  Plotly.relayout(plotEl, {
+                    'shapes[0].x0': bestCandidate.t,
+                    'shapes[0].x1': bestCandidate.t,
+                    'shapes[1].y0': bestQ,
+                    'shapes[1].y1': bestQ
+                  });
+                }
+              } catch (err) {
+                console.error('FindU relayout error:', err);
+              }
+
+              finduResult.innerHTML = 'Chosen C* = <strong>' + bestCandidate.t.toFixed(3);
+            }).catch(function (err) {
+              finduResult.innerText = 'Failed to load precomputed data: ' + err.message;
+              console.warn(err);
+            });
+          });
+        }
+      });
+
+    </script>
+</body>
+
+</html>

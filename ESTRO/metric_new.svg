@@ -1,0 +1,192 @@
+<svg viewBox="0 0 200 110" preserveAspectRatio="xMidYMid meet" style="overflow:visible" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="SOTA UQ metrics pipeline showing entropy and Dice-based uncertainty quantification">
+  <title id="metricTitle">SOTA UQ Metrics Pipeline</title>
+  <desc id="metricDesc">Complete pipeline: Deep learning model generates n predictions, averaged to compute per-pixel probabilities p(x). Two uncertainty branches: (1) Entropy H(x) computed pixel-wise from p(x), highlighting boundary uncertainty. (2) Dice-based uncertainty computed by measuring overlap between each prediction and the mean mask, summarized as mean or std across predictions. Higher entropy or lower Dice indicate regions of low model consensus.</desc>
+  
+  <style>
+    .blend-circle {
+      mix-blend-mode: screen;
+    } 
+  </style>
+  
+  <defs>
+    <!-- Arrow marker (smaller for thinner connectors) -->
+    <marker id="arrowhead" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+      <polygon points="0 0, 6 3, 0 6" fill="#4a8ec2"/>
+    </marker> 
+
+    <!-- Reusable cluster of averaged circles for overlap calculations (alpha chosen so 3 overlaps exceed 50%) -->
+    <g id="avgOverlapCirclesShape">
+      <!-- set per-circle alpha to 0.25 so 3-overlap combined alpha = 1-(1-0.25)^3 ≈ 0.578 (>0.5) -->
+      <circle class="blend-circle" cx="54" cy="36" r="6" fill="white" opacity="0.25"/>
+      <circle class="blend-circle" cx="53" cy="38" r="6.5" fill="white" opacity="0.25"/>
+      <circle class="blend-circle" cx="50" cy="33" r="7.5" fill="white" opacity="0.25"/>
+      <circle class="blend-circle" cx="55" cy="37" r="8" fill="white" opacity="0.25"/>
+      <circle class="blend-circle" cx="54" cy="32" r="6" fill="white" opacity="0.25"/>
+      <circle class="blend-circle" cx="55" cy="36" r="7" fill="white" opacity="0.25"/>
+      <circle class="blend-circle" cx="53" cy="35" r="8" fill="white" opacity="0.25"/>
+      <circle class="blend-circle" cx="54" cy="36.5" r="9" fill="white" opacity="0.25"/>
+    </g>
+
+    <!-- Threshold mask that keeps only regions where >=50% (~4/7) of the circles overlap -->
+    <filter id="overlap50Threshold" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB">
+      <!-- table mapping sampled alpha -> {0,1} with threshold just above 0.5; 11 steps gives 0.0..1.0 in 0.1 increments -->
+      <feComponentTransfer in="SourceAlpha">
+        <!-- inputs 0..0.5 map to 0, inputs >0.5 map to 1 -->
+        <feFuncA type="table" tableValues="0 0 0 0 0 0 1 1 1 1 1"/>
+      </feComponentTransfer>
+    </filter>
+
+    <mask id="overlap50Mask" maskUnits="userSpaceOnUse" maskContentUnits="userSpaceOnUse" x="0" y="0" width="850" height="420">
+      <g filter="url(#overlap50Threshold)">
+        <use href="#avgOverlapCirclesShape"/>
+      </g>
+    </mask>
+
+    <!-- Panel-specific masks so mask content aligns with transformed tiles -->
+    <mask id="overlap50Mask_avg" maskUnits="userSpaceOnUse" maskContentUnits="userSpaceOnUse" x="0" y="0" width="850" height="420">
+      <g transform="translate(360,120) scale(1.15)">
+        <g filter="url(#overlap50Threshold)">
+          <use href="#avgOverlapCirclesShape"/>
+        </g>
+      </g>
+    </mask>
+
+    <mask id="overlap50Mask_entropy" maskUnits="userSpaceOnUse" maskContentUnits="userSpaceOnUse" x="0" y="0" width="850" height="420">
+      <g transform="translate(515,78) scale(1.15)">
+        <g filter="url(#overlap50Threshold)">
+          <use href="#avgOverlapCirclesShape"/>
+        </g>
+      </g>
+    </mask>
+
+    <mask id="overlap50Mask_dice" maskUnits="userSpaceOnUse" maskContentUnits="userSpaceOnUse" x="0" y="0" width="850" height="420">
+      <g transform="translate(515,213) scale(1.15)">
+        <g filter="url(#overlap50Threshold)">
+          <use href="#avgOverlapCirclesShape"/>
+        </g>
+      </g>
+    </mask>
+
+    <!-- Reusable highlight for >=50% overlap (neutral definitions - mask applied at use sites) -->
+    <g id="overlap50Highlight">
+      <circle cx="54" cy="36" r="6" fill="#e6f7ff" opacity="0.8"/>
+    </g>
+    <g id="overlap50Downlight">
+      <circle cx="54" cy="36" r="6" fill="#0a0a0a" opacity="0.8"/>
+    </g>
+
+    <!-- Inverse mask: keeps regions outside the >=50% overlap (disagreement band) -->
+    <filter id="overlap50InverseThreshold" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB">
+      <!-- inverse table of overlap50Threshold: inputs <=0.5 -> 1 (keep), inputs >0.5 -> 0 (discard) -->
+      <feComponentTransfer in="SourceAlpha">
+        <feFuncA type="table" tableValues="1 1 1 1 1 1 0 0 0 0 0"/>
+      </feComponentTransfer>
+    </filter>
+
+    <mask id="overlap50InverseMask" maskUnits="userSpaceOnUse" maskContentUnits="userSpaceOnUse" x="0" y="0" width="850" height="420">
+      <g filter="url(#overlap50InverseThreshold)">
+        <use href="#avgOverlapCirclesShape"/>
+      </g>
+    </mask>
+
+    <!-- Panel-specific inverse masks so inverse mask content aligns with transformed tiles -->
+    <mask id="overlap50InverseMask_avg" maskUnits="userSpaceOnUse" maskContentUnits="userSpaceOnUse" x="0" y="0" width="850" height="420">
+      <g transform="translate(360,120) scale(1.15)">
+        <g filter="url(#overlap50InverseThreshold)">
+          <use href="#avgOverlapCirclesShape"/>
+        </g>
+      </g>
+    </mask>
+
+    <mask id="overlap50InverseMask_entropy" maskUnits="userSpaceOnUse" maskContentUnits="userSpaceOnUse" x="0" y="0" width="850" height="420">
+      <g transform="translate(515,78) scale(1.15)">
+        <g filter="url(#overlap50InverseThreshold)">
+          <use href="#avgOverlapCirclesShape"/>
+        </g>
+      </g>
+    </mask>
+
+    <mask id="overlap50InverseMask_dice" maskUnits="userSpaceOnUse" maskContentUnits="userSpaceOnUse" x="0" y="0" width="850" height="420">
+      <g transform="translate(515,213) scale(1.15)">
+        <g filter="url(#overlap50InverseThreshold)">
+          <use href="#avgOverlapCirclesShape"/>
+        </g>
+      </g>
+    </mask>
+ 
+
+    <!-- CT Scan template function -->
+    <g id="ctTemplate">
+      <rect width="80" height="80" rx="3" fill="#0a0a0a"/>
+      <!-- Body outline (coronal slice - anterior to posterior view) -->
+      <ellipse cx="40" cy="40" rx="32" ry="26" fill="#1a1a1a" stroke="#2a2a2a" stroke-width="1"/>
+
+      <!-- Spine (coronal view - single vertebra visible at center depth, lower) -->
+      <g id="spine" opacity="0.6">
+        <path d="M36 52 L44 51.5 L45 61 L36.5 61.5 Z" fill="#3a3a3a" stroke="#404040" stroke-width="0.3"/>
+      </g>
+
+      <!-- Right lung (thick posteriorly, taper anteriorly - larger) -->
+      <path d="M44 18 C65 20 70 50 62 58 C54 62 46 60 44 52 C42 38 42 26 44 18 Z" fill="#050505" stroke="#151515" stroke-width="0.5"/>
+      
+      <!-- Left lung with pronounced cardiac notch (thick posteriorly, larger) -->
+      <path d="M36 18 C15 20 10 50 18 58 C26 62 34 60 36 52 C38 44 38 34 36 26 C36 22 36 18 36 18 Z" fill="#050505" stroke="#151515" stroke-width="0.5"/>
+      
+      <!-- Cardiac notch - concave indentation on medial surface of left lung (larger) -->
+      <path d="M36 32 Q28 40 31 46 Q35 40 36 32 Z" fill="#0a0a0a" stroke="none" opacity="0.7"/>
+
+      <!-- Heart (more anterior, larger, higher, rightward) -->
+      <g transform="translate(32,32)">
+        <ellipse cx="4" cy="4" rx="7" ry="9" fill="#353535" stroke="#404040" stroke-width="0.4"/>
+        <path d="M -1 2 Q 4 -3 9 2 Q 6 9 4 12 Q 2 9 -1 2 Z" fill="#2f2f2f" opacity="0.95"/>
+      </g>
+    </g>
+  </defs>
+
+  
+  <!-- Dice branch -->
+  <g id="diceBranch" data-node-id="dice-branch" role="group" aria-label="Dice-based uncertainty computation branch">
+
+    
+    <!-- Dice visualization showing overlap -->
+    <g class="dice-viz" transform="translate(10, 10) scale(1.15)">
+      <use href="#ctTemplate"/>
+      
+      <!-- Average mask (white) -->
+      <circle class="dice-avg-mask" cx="52" cy="35" r="8" fill="white" opacity="0.6"/>
+      
+      <!-- Prediction mask (green) - offset for overlap -->
+      <circle class="dice-pred-mask" cx="56" cy="38" r="8" fill="#66bb6a" opacity="0.6"/>
+      
+      <!-- Intersection highlighting - shows the overlap area -->
+      <g class="dice-intersection" opacity="1">
+        <!-- Redraw masks with lower opacity -->
+        <circle cx="52" cy="35" r="8" fill="white" opacity="0.3"/>
+        <circle cx="56" cy="38" r="8" fill="#66bb6a" opacity="0.3"/>
+      </g>
+    </g>
+ 
+    
+    <!-- Dice histogram visualization (moved up and recolored to Dice color) -->
+    <g transform="translate(130, 40) scale(0.8)">
+      <rect x="-10" y="57" width="8" height="3" fill="#c5e1f5" opacity="0.4"/>
+      <rect x="0" y="51" width="8" height="9" fill="#c5e1f5" opacity="0.5"/>
+      <rect x="10" y="47" width="8" height="13" fill="#c5e1f5" opacity="0.7"/>
+      <rect x="20" y="27" width="8" height="33" fill="#c5e1f5" opacity="0.95"/>
+      <rect x="30" y="37" width="8" height="23" fill="#c5e1f5" opacity="0.8"/>
+      <rect x="40" y="47" width="8" height="13" fill="#c5e1f5" opacity="0.6"/>
+      <rect x="50" y="58" width="8" height="2" fill="#c5e1f5" opacity="0.3"/>
+      <!-- Mean marker: dashed vertical line and small dot -->
+      <line x1="22" y1="8" x2="22" y2="60" stroke="#ffd54f" stroke-width="1" stroke-dasharray="2,2" opacity="0.9"/>
+      <circle cx="22" cy="7" r="1.6" fill="#ffd54f" opacity="0.95"/>
+      <text x="22" y="-2" text-anchor="middle" fill="#ffd54f" font-size="7" stroke="#000000" stroke-width="0.4" paint-order="stroke">Dice</text>
+      <text x="-10" y="66" text-anchor="middle" fill="#222222" font-size="4" stroke="#000000" stroke-width="0.2" paint-order="stroke">0.5</text>
+      <text x="25" y="66" text-anchor="middle" fill="#222222" font-size="4" stroke="#000000" stroke-width="0.2" paint-order="stroke">0.75</text>
+      <text x="60" y="66" text-anchor="middle" fill="#222222" font-size="4" stroke="#000000" stroke-width="0.2" paint-order="stroke">1</text> 
+    </g>
+     
+    
+  </g>
+   
+   
+</svg>

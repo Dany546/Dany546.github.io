@@ -1,0 +1,125 @@
+/* Papers interactive slide styles */
+.papers-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 14px;
+}
+
+.papers-tabs button {
+    background: #f0f6ff;
+    border: 1px solid #dbeeff;
+    color: #003366;
+    padding: 8px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+}
+
+.papers-tabs button[aria-selected="true"] {
+    background: #0066CC;
+    color: white;
+    box-shadow: 0 6px 18px rgba(43, 114, 211, 0.18);
+}
+
+.papers-content {
+    display: block;
+    min-height: 440px;
+}
+
+.paper-page {
+    display: none;
+    opacity: 0;
+    transform: translateY(6px);
+    transition: opacity .22s ease, transform .22s ease;
+}
+
+.paper-page.active {
+    display: flex;
+    opacity: 1;
+    transform: translateY(0);
+    gap: 18px;
+}
+
+.paper-left {
+    flex: 1 1 60%;
+}
+
+.paper-right {
+    flex: 1 1 40%;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.pdf-wrap {
+    width: 100%;
+    height: 420px;
+    background: #fafafa;
+    border: 1px solid #eee;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.pdf-wrap iframe {
+    width: 100%;
+    height: 100%;
+    border: 0;
+    border-radius: 6px;
+}
+
+.pdf-placeholder {
+    color: #445;
+    font-size: 14px;
+    padding: 12px;
+}
+
+.notes .collapse-toggle {
+    background: #fff;
+    border: 1px solid #e6eef9;
+    padding: 6px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+.notes .note-body {
+    margin-top: 8px;
+    background: #fbfbfd;
+    border: 1px solid #eef4ff;
+    padding: 10px;
+    border-radius: 6px;
+    display: block;
+}
+
+.figure {
+    min-height: 180px;
+    background: linear-gradient(90deg, #fbfdff, #fff);
+    border-radius: 8px;
+    border: 1px solid #eef4ff;
+    padding: 8px;
+}
+
+@media (max-width:1100px) {
+    .paper-page {
+        flex-direction: column;
+    }
+
+    .paper-left,
+    .paper-right {
+        flex: 1 1 100%;
+    }
+
+    .pdf-wrap {
+        height: 320px;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .paper-page {
+        transition: none !important;
+    }
+}
+
+/* Utility helpers */
+.hidden { display: none !important; }
